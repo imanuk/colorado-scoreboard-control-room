@@ -1,24 +1,39 @@
 {
-  "name": "coloradoScoreboard",
-  "version": "0.1.0",
-  "description": "Bridge Colorado Timing System (CTS) scoreboard to web pages",
-  "main": "coloradoScoreboard.js",
-  "directories": {
-    "src": "src"
+  "name": "colorado-scoreboard-control-room",
+  "version": "2.0.0",
+  "description": "Colorado Timing Gen7 scoreboard bridge with a stream-day control room (OBS, GoPro, YouTube), live heat sheets, and local live view. Fork of fabriziobertocci/coloradoScoreboard.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js -7 -u 50",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": [
+    "swimming",
+    "scoreboard",
+    "colorado-timing",
+    "gen7",
+    "rs-485",
+    "obs",
+    "streaming"
+  ],
+  "author": "imanuk",
+  "license": "AGPL-3.0-or-later",
+  "type": "commonjs",
   "dependencies": {
-    "serialport": "*",
-    "socket.io": "^4.8.1",
-    "sprintf-js": "*"
+    "express": "^5.2.1",
+    "serialport": "^13.0.0",
+    "socket.io": "^4.8.3",
+    "sprintf-js": "^1.1.3"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/fabriziobertocci/coloradoScoreboard"
+    "url": "git+https://github.com/imanuk/colorado-scoreboard-control-room.git"
   },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "bugs": {
+    "url": "https://github.com/imanuk/colorado-scoreboard-control-room/issues"
   },
-  "keywords": [],
-  "author": "fabriziobertocci@gmail.com",
-  "license": "MIT"
+  "homepage": "https://github.com/imanuk/colorado-scoreboard-control-room#readme",
+  "engines": {
+    "node": ">=22"
+  }
 }

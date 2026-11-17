@@ -1,0 +1,119 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>More pages</title>
+<style>
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: #14181c;
+    color: #e8eef2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  .card {
+    width: 420px;
+    max-width: 90vw;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  .sub {
+    color: #8a97a3;
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+  #status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #2a2f36;
+    margin-bottom: 20px;
+  }
+  #status .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #666;
+  }
+  #status.connected .dot { background: #34c759; }
+  #status.disconnected .dot { background: #ff453a; }
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+  }
+  a.page-link {
+    display: block;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: #1c2127;
+    border: 1px solid #262c33;
+    color: #e8eef2;
+    text-decoration: none;
+    font-size: 14px;
+  }
+  a.page-link:hover {
+    border-color: #3b82f6;
+  }
+  a.page-link .desc {
+    display: block;
+    color: #8a97a3;
+    font-size: 12px;
+    margin-top: 2px;
+  }
+  .diag-link {
+    margin-top: 16px;
+    border-style: dashed;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>All pages</h1>
+  <div class="sub">The display pages used as the TV / OBS browser sources, and the tools. Day to day you only need the control room.</div>
+  <div id="status" class="disconnected"><span class="dot"></span><span id="status-text">checking link...</span></div>
+  <ul>
+    <li><a class="page-link" href="tv.html">TV<span class="desc">Full scoreboard for the second screen</span></a></li>
+    <li><a class="page-link" href="merged.html">Merged<span class="desc">Combined overlay layout</span></a></li>
+    <li><a class="page-link" href="scores.html">Scores<span class="desc">Compact scores panel</span></a></li>
+    <li><a class="page-link" href="start.html">Start<span class="desc">Pre-race / event card</span></a></li>
+    <li><a class="page-link" href="watch.html">Live view<span class="desc">Near-real-time full-screen view of what OBS is sending (for other computers too)</span></a></li>
+    <li><a class="page-link" href="live/">Heat sheets (marshals / team managers / swimmers)<span class="desc">The live heat sheet pages - see the "Live heat sheet" notes in the README</span></a></li>
+    <li><a class="page-link" href="live/admin.html">Heat sheet admin<span class="desc">Settings, publishing and clearing times for the live heat sheets - the scoreboard Mac only</span></a></li>
+    <li><a class="page-link" href="meet.html">Choose meet<span class="desc">Load a meet's names/titles from the Google Drive Meets folder</span></a></li>
+    <li><a class="page-link" href="timer.html">Timer<span class="desc">Race clock only</span></a></li>
+    <li><a class="page-link" href="nextrace.html">Next race<span class="desc">Get-ready prompt only - optional stream overlay (transparent when empty)</span></a></li>
+    <li><a class="page-link" href="result.html">Result<span class="desc">Results card</span></a></li>
+    <li><a class="page-link" href="res.html">Res<span class="desc">Alternate results layout</span></a></li>
+    <li><a class="page-link" href="touch.html">Touch<span class="desc">Live touch/split tracking</span></a></li>
+  </ul>
+  <a class="page-link diag-link" href="diagnostics.html">Diagnostics<span class="desc">Live raw serial data, channel table, connection health, recent issues</span></a>
+  <a class="page-link diag-link" href="streaming-guide.html">Stream Setup<span class="desc">OBS + GoPro + recording checklist</span></a>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+    <script src="/autoreload.js"></script>
+<script>
+  const socket = io();
+        watchVersion(socket);
+  const statusEl = document.getElementById('status');
+  const statusText = document.getElementById('status-text');
+  socket.on('scoreboard', (data) => {
+    const connected = !!data.serial_connected;
+    statusEl.className = connected ? 'connected' : 'disconnected';
+    statusText.textContent = connected ? `Live (${data.serial_port})` : 'No serial link';
+  });
+</script>
+<script src="/backlink.js"></script>
+</body>
+</html>

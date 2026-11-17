@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en-GB">
+<head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Whole meet</title><link rel="stylesheet" href="live.css"></head>
+<body><div class="wrap">
+<header><h1 id="title">Whole meet</h1><div class="status" id="status"></div><div class="banner" id="banner"></div></header>
+<div class="seg"><a href="athlete.html">My swimmers</a><a href="team.html">Whole club</a><a class="on" href="wholemeet.html">Whole meet</a></div>
+<input type="text" id="q" placeholder="Find a swimmer or club (shows only their heats)" autocomplete="off" style="margin-bottom:6px">
+<div class="row" style="margin-bottom:10px"><button id="hideDone">Finished heats: hidden</button><button id="jump">Jump to next heat</button></div>
+<div id="list"></div>
+<div class="hint" style="margin-top:18px">Every heat in running order, with everyone in it and their seed times. All times are predictions and correct themselves as each race starts. Scoreboard times are copied from the timing console as each race finishes - they are not official, and officials can change or overrule them. <a href="index.html">Other views</a></div>
+</div>
+<script src="/socket.io/socket.io.js"></script><script src="/autoreload.js"></script><script src="live-config.js"></script><script src="schedule-core.js"></script><script src="live-client.js"></script>
+<script>
+  var $ = function (id) { return document.getElementById(id); };
+  function get(k, d) { try { var v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }
+  function put(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  var hideDone = get('meet.hideDone', '1') === '1', scrolled = false;
+  $('hideDone').addEventListener('click', function () { hideDone = !hideDone; put('meet.hideDone', hideDone ? '1' : '0'); render(); });
+  $('q').addEventListener('input', render);
+  $('jump').addEventListener('click', function () { var n = document.querySelector('.heatblock.next') || document.querySelector('.heatblock.racing'); if (n) n.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+
+  // One continuous heat sheet: each event's title once, then its heats one after another with
+  // every swimmer listed under the heat - nothing to tap, nothing repeated.
+  function render() {
+    Live.renderHeader($('title'), $('status'), $('banner'));
+    if (!Live.meet) return;
+    $('hideDone').textContent = hideDone ? 'Finished heats: hidden (latest 3 kept)' : 'Finished heats: shown'; $('hideDone').className = hideDone ? 'on' : '';
+    var q = $('q').value.trim().toLowerCase(), now = Live.now(), list = $('list'), lastEvent = null, shown = 0, nextSeen = false;
+    var keepScroll = window.scrollY;
+    list.textContent = '';
+    Live.meet.heats.forEach(function (h) {
+      var e = Live.eta(h.i), status = e ? e.status : null;
+      if (hideDone && !q && status === 'done' && !Live.recentlyDone(h.i)) return;
+      var hits = q ? h.lanes.filter(function (l) { return l.name.toLowerCase().indexOf(q) >= 0 || l.club.toLowerCase().indexOf(q) >= 0; }) : [];
+      if (q && !hits.length) return;
+      shown++;
+      if (h.event !== lastEvent) {
+        lastEvent = h.event;
+        var ev = el('div', 'evhead'); ev.appendChild(el('div', 't', h.title)); ev.appendChild(el('div', 's', 'Event ' + h.event)); list.appendChild(ev);
+      }
+      var isNext = status === 'next' && !nextSeen; if (isNext) nextSeen = true;
+      var blk = el('div', 'heatblock' + (status === 'done' ? ' done' : '') + (status === 'racing' ? ' racing' : '') + (isNext ? ' next' : ''));
+      var hb = el('div', 'hb'); var left = el('span', '', 'Heat ' + h.heat + ' of ' + h.heatsInEvent);
+      if (status === 'racing') left.appendChild(el('span', 'badge racing', 'RACING')); else if (isNext) left.appendChild(el('span', 'badge soon', 'NEXT')); else if (status === 'done') left.appendChild(el('span', 'badge', 'DONE'));
+      hb.appendChild(left);
+      if (e && e.startMs && status !== 'done') { var w = el('span', 'when', 'Predicted dive in ' + ScheduleCore.clock(e.startMs) + ' '); w.appendChild(el('span', '', status === 'racing' ? '(in the pool now)' : '(' + ScheduleCore.relative(e.startMs, now) + ')')); hb.appendChild(w); }
+      blk.appendChild(hb);
+      h.lanes.forEach(function (l) {
+        var r = el('div', 'hl' + (hits.indexOf(l) >= 0 ? ' hit' : ''));
+        r.appendChild(el('div', 'n', String(l.lane)));
+        var d = el('div'); d.appendChild(document.createTextNode(l.name + ' ')); d.appendChild(el('span', 'c', l.club)); r.appendChild(d);
+        var en = el('div', 'en', l.entry || ''), rs = Live.result(h.i, l.lane);
+        if (rs) { blk.className += ' hasres'; en.className += ' withres'; en.appendChild(el('span', 'rt', rs.time + (rs.place ? ' (' + rs.place + ')' : ''))); }
+        r.appendChild(en); blk.appendChild(r);
+      });
+      list.appendChild(blk);
+    });
+    if (!shown) list.appendChild(el('div', 'hint', q ? 'No heats found for that.' : 'No heats to show.'));
+    window.scrollTo(0, keepScroll); // a refresh must not throw the reader back to the top
+    if (!scrolled && Live.computed && Live.computed.valid) { var n = document.querySelector('.heatblock.next') || document.querySelector('.heatblock.racing'); if (n) { scrolled = true; n.scrollIntoView({ block: 'center' }); } }
+  }
+  Live.onChange(render); Live.start({ role: 'meet' });
+</script>
+</body></html>

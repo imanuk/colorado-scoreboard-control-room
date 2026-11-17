@@ -1,0 +1,88 @@
+#!/bin/bash
+# One icon for stream day. Gets everything ready, in order, and ends by opening
+# the control room page (green ticks for each check, live preview, scoreboard):
+#   1. scoreboard service (under launchd, restarts itself if it crashes)
+#   2. which meet (loads its names/titles from the shared Google Drive folder)
+#   3. GoPro: start its Webcam app, wait for the camera, point OBS at it, and
+#      switch on OBS remote control (localhost only) for the control room
+#   4. OBS
+# It never starts streaming or recording - that is a separate, confirmed step.
+
+PROJECT_DIR="__PROJECT_DIR__"
+LABEL="__LABEL__"
+PLIST_PATH="$PROJECT_DIR/scripts/$LABEL.plist"
+UID_GUI="gui/$(id -u)"
+PORT=8080
+NODE_BIN="__NODE_PATH__"
+[ -x "$NODE_BIN" ] || NODE_BIN="$(command -v node)"
+
+echo "Stream Day - Start"
+echo "=============================="
+
+# ---- 1. scoreboard service -------------------------------------------------
+echo ""
+echo "[1/4] Scoreboard service"
+if [ ! -f "$PLIST_PATH" ]; then
+    echo "ERROR: $PLIST_PATH not found - run scripts/install.sh once first."
+    read -n 1 -s -r -p "Press any key to close..."
+    exit 1
+fi
+if launchctl print "$UID_GUI/$LABEL" >/dev/null 2>&1; then
+    echo "  already running"
+else
+    echo "  starting..."
+    launchctl bootstrap "$UID_GUI" "$PLIST_PATH"
+fi
+for i in $(seq 1 30); do
+    if curl -s -o /dev/null "http://localhost:$PORT/"; then echo "  up on port $PORT"; break; fi
+    sleep 1
+    [ "$i" -eq 30 ] && echo "  WARNING: no response after 30s - see $PROJECT_DIR/logs/"
+done
+
+# ---- 2. meet -----------------------------------------------------------------
+echo ""
+echo "[2/4] Meet"
+SCOREBOARD_PORT=$PORT "$NODE_BIN" "$PROJECT_DIR/scripts/choose-meet.js"
+
+# ---- 3. camera + OBS settings --------------------------------------------------
+echo ""
+echo "[3/4] Camera"
+"$NODE_BIN" "$PROJECT_DIR/scripts/prepare-camera.js"
+CAMERA_RC=$?
+if [ "$CAMERA_RC" -eq 3 ]; then
+    echo ""
+    echo "  OBS is open and needs a restart once, to switch its remote control on."
+    echo "  Only do this if you are NOT live right now."
+    read -r -p "  Quit OBS now and carry on? [y/N] " ANSWER
+    if [ "$ANSWER" = "y" ] || [ "$ANSWER" = "Y" ]; then
+        osascript -e 'tell application "OBS" to quit' >/dev/null 2>&1
+        for i in $(seq 1 30); do pgrep -x OBS >/dev/null 2>&1 || break; sleep 1; done
+        if pgrep -x OBS >/dev/null 2>&1; then
+            echo "  OBS is still open (it may be asking to confirm) - quit it yourself, then run this again."
+        else
+            "$NODE_BIN" "$PROJECT_DIR/scripts/prepare-camera.js"
+        fi
+    else
+        echo "  Left OBS as it is - the control room will show what is missing."
+    fi
+elif [ "$CAMERA_RC" -ne 0 ]; then
+    echo "  Carrying on without the camera - fix the above and run this icon again if you need it."
+fi
+
+# ---- 4. OBS ---------------------------------------------------------------------
+echo ""
+echo "[4/4] OBS Studio"
+if pgrep -x OBS >/dev/null 2>&1; then
+    echo "  already open"
+else
+    echo "  opening..."
+    open -a "OBS" 2>/dev/null || echo "  WARNING: could not open OBS - is it at /Applications/OBS.app?"
+fi
+
+echo ""
+echo "Opening the control room - it runs the checks (green ticks) as soon as it loads."
+sleep 4
+open "http://localhost:$PORT/control.html"
+echo ""
+echo "You can close this window. Nothing has been started on air."
+sleep 2

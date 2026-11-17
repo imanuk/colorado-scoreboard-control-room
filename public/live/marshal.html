@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en-GB">
+<head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Marshal</title><link rel="stylesheet" href="live.css">
+<style>
+  .lane { display:grid; grid-template-columns: 38px 1fr auto 34px; gap:8px; align-items:center; padding:5px 2px; border-top:1px solid var(--line); }
+  .lane .n { font-size:28px; font-weight:700; color:var(--gold); text-align:center; line-height:1; }
+  .lane .nm { font-size:19px; line-height:1.15; } .lane .cl { color:var(--dim); font-size:12px; }
+  .nav { display:flex; gap:8px; margin:8px 0; } .nav button { flex:1; font-size:15px; padding:9px 6px; }
+  .lane .en { font-size:18px; font-variant-numeric: tabular-nums; color:var(--text); text-align:right; }
+  .heatline { font-size:22px; font-weight:700; color:var(--gold); margin-top:2px; }
+  .bigtime { font-size:30px; font-weight:700; color:var(--gold); font-variant-numeric: tabular-nums; }
+</style></head>
+<body><div class="wrap">
+<header><h1 id="title">Marshal</h1><div class="status" id="status"></div><div class="banner" id="banner"></div></header>
+<div class="label hint" style="margin-bottom:-4px">Your marshalling position <span id="pos0note"></span></div>
+<div class="chips" id="positions" style="margin:6px 0"></div>
+<div class="row"><button id="order" style="padding:8px 12px;font-size:14px"></button><label class="hint" style="display:flex;align-items:center;gap:6px">or any position <input type="number" id="posbox" min="0" max="99" inputmode="numeric" style="width:76px;font:inherit;font-size:16px;padding:7px 8px;border-radius:8px;border:1px solid var(--line);background:#0e1216;color:var(--text)"></label></div>
+<div class="nav"><button id="prev">&#9664; Earlier heat</button><button id="auto">Auto</button><button id="next">Later heat &#9654;</button></div>
+<div id="heat"></div>
+<div class="hint" style="margin-top:18px">Position 0 is the heat next in the pool; 1 is the heat after that, and so on. The screen moves on by itself as races go. Times shown are predictions; the number on the right of each swimmer is their seed time. Use the arrows to look at other heats, and Auto to come back. <a href="index.html">Other views</a></div>
+</div>
+<script src="/socket.io/socket.io.js"></script><script src="/autoreload.js"></script><script src="live-config.js"></script><script src="schedule-core.js"></script><script src="live-client.js"></script>
+<script>
+  var $ = function (id) { return document.getElementById(id); };
+  function get(k, d) { try { var v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }
+  function put(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  var position = parseInt(get('marshal.position', '0'), 10) || 0, reverse = get('marshal.reverse', '0') === '1', manual = null;
+
+  $('posbox').addEventListener('change', function () { var v = parseInt($('posbox').value, 10); position = isNaN(v) ? 0 : Math.max(0, Math.min(99, v)); manual = null; put('marshal.position', String(position)); render(); });
+  $('order').addEventListener('click', function () { reverse = !reverse; put('marshal.reverse', reverse ? '1' : '0'); render(); });
+  $('auto').addEventListener('click', function () { manual = null; render(); });
+  function shift(d) { var cur = shownIndex(); if (cur === null) return; manual = Math.max(0, Math.min(Live.meet.heats.length - 1, cur + d)); render(); }
+  $('prev').addEventListener('click', function () { shift(-1); });
+  $('next').addEventListener('click', function () { shift(1); });
+
+  // Before the meet starts (the console is not on a heat in the draw) positions simply count from heat 1,
+  // so marshals can see and plan the heats in advance.
+  function autoIndex() { var base = ScheduleCore.marshalBase(Live.state, Live.settings); return (base === null ? 0 : base) + position; }
+  function started() { return ScheduleCore.marshalBase(Live.state, Live.settings) !== null; }
+  function shownIndex() { return manual !== null ? manual : autoIndex(); }
+
+  function render() {
+    Live.renderHeader($('title'), $('status'), $('banner'));
+    if (!Live.meet) return;
+    var n = Math.min(Live.settings.heatsAhead, 20), pos = $('positions'); pos.textContent = '';
+    if (document.activeElement !== $('posbox')) $('posbox').value = position;
+    for (var p = 0; p < n; p++) { (function (p) { var b = el('button', p === position ? 'on' : '', String(p)); b.addEventListener('click', function () { position = p; manual = null; put('marshal.position', String(p)); render(); }); pos.appendChild(b); })(p); }
+    $('order').textContent = reverse ? 'Lanes: highest first (reverse)' : 'Lanes: lowest first';
+    $('pos0note').textContent = position === 0 ? '(0 = next in the pool)' : '';
+    $('auto').className = manual === null ? 'on' : '';
+    $('auto').textContent = manual === null ? 'Auto' : 'Back to Auto';
+
+    var box = $('heat'); box.textContent = '';
+    var idx = shownIndex();
+    if (idx === null || idx >= Live.meet.heats.length) { box.appendChild(el('div', 'card', 'No more heats.')); return; }
+    var h = Live.meet.heats[idx], e = Live.eta(idx), now = Live.now(), c = el('div', 'card');
+    if (e && e.status === 'racing') c.className += ' racing';
+
+    // 1. what this view is
+    var note = manual !== null ? 'Looking at a different heat (manual)' : (started() ? 'Position ' + position : 'Meet not started - position ' + position + ' counts from the first heat');
+    c.appendChild(el('div', 'who', note + ' \u00b7 heat ' + (idx + 1) + ' of ' + Live.meet.heats.length));
+    // 2. event title, 3. heat
+    c.appendChild(el('div', 'race', h.title));
+    c.appendChild(el('div', 'heatline', 'Event ' + h.event + ' \u00b7 Heat ' + h.heat + ' of ' + h.heatsInEvent));
+    // predicted times
+    if (e && e.startMs && e.status !== 'done') {
+      var t = el('div', 'times');
+      if (e.status !== 'racing') { var a1 = el('div'); a1.appendChild(el('div', 'label', 'Predicted report by')); a1.appendChild(el('div', 'bigtime', ScheduleCore.clock(e.reportMs))); a1.appendChild(el('div', 'rel', e.reportMs <= now ? 'due now' : ScheduleCore.relative(e.reportMs, now))); t.appendChild(a1); }
+      var a2 = el('div'); a2.appendChild(el('div', 'label', e.status === 'racing' ? 'In the pool now - started' : 'Predicted dive in')); a2.appendChild(el('div', 'bigtime', ScheduleCore.clock(e.startMs))); a2.appendChild(el('div', 'rel', ScheduleCore.relative(e.startMs, now)));
+      t.appendChild(a2); c.appendChild(t);
+    } else if (e && e.status === 'done') c.appendChild(el('div', 'hint', 'This heat has finished.'));
+    else if (!e) c.appendChild(el('div', 'hint', 'Predicted times appear once the meet starts (or once a meet start time is set).'));
+    // 4. the swimmers: lane, name, club, seed time
+    var lanes = h.lanes.slice().sort(function (x, y) { return reverse ? y.lane - x.lane : x.lane - y.lane; });
+    var ticks = Live.ticks('marshal'), arrived = 0;
+    lanes.forEach(function (l) { if (ticks.has(idx, l.lane)) arrived++; });
+    var tb = el('div', 'tickbar'); var sm = el('span'); sm.appendChild(el('b', '', arrived + ' of ' + lanes.length)); sm.appendChild(document.createTextNode(' arrived (ticks stay on this device only)')); tb.appendChild(sm);
+    var allb = el('button', '', 'All arrived'); allb.addEventListener('click', function () { lanes.forEach(function (l) { ticks.set(idx, l.lane, true); }); render(); }); tb.appendChild(allb);
+
+    c.appendChild(tb);
+    var wrap = el('div'); wrap.style.marginTop = '4px';
+    lanes.forEach(function (l) {
+      var isHere = ticks.has(idx, l.lane);
+      var row = el('div', 'lane' + (isHere ? ' ticked' : '')); row.appendChild(el('div', 'n', String(l.lane)));
+      var d = el('div'); d.appendChild(el('div', 'nm', l.name)); d.appendChild(el('div', 'cl', l.club)); row.appendChild(d);
+      row.appendChild(el('div', 'en', l.entry || ''));
+      var cb = el('input', 'tick'); cb.type = 'checkbox'; cb.checked = isHere; cb.title = 'Tick when this swimmer has arrived';
+      cb.addEventListener('change', function () { ticks.set(idx, l.lane, cb.checked); render(); });
+      row.appendChild(cb);
+      wrap.appendChild(row);
+    });
+    c.appendChild(wrap); box.appendChild(c);
+  }
+  Live.onChange(render); Live.start({ role: 'marshal' });
+</script>
+</body></html>

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en-GB">
+<head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width, initial-scale=1"><title>My races</title><link rel="stylesheet" href="live.css"></head>
+<body><div class="wrap">
+<header><h1 id="title">My races</h1><div class="status" id="status"></div><div class="banner" id="banner"></div></header>
+<div class="seg"><a class="on" href="athlete.html">My swimmers</a><a href="team.html">Whole club</a><a href="wholemeet.html">Whole meet</a></div>
+
+<div id="chosen"></div>
+<div class="chips" id="chips"></div>
+<div id="finder">
+  <input type="text" id="q" placeholder="Type a swimmer's name to follow them" autocomplete="off" autocapitalize="words">
+  <div id="results" style="margin-top:8px"></div>
+</div>
+<div id="races"></div>
+<div class="hint" style="margin-top:18px">Pick a name once - this phone remembers it. You can follow more than one swimmer (brothers and sisters, say). All times are predictions and correct themselves as each race starts. Scoreboard times are copied from the timing console as each race finishes - they are not official, and officials can change or overrule them. <a href="index.html">Other views</a></div>
+</div>
+<script src="/socket.io/socket.io.js"></script><script src="/autoreload.js"></script><script src="live-config.js"></script><script src="schedule-core.js"></script><script src="live-client.js"></script>
+<script>
+  var KEY = 'live.followed';
+  var followed = [];
+  try { followed = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) {}
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(followed)); } catch (e) {} }
+  var $ = function (id) { return document.getElementById(id); };
+
+  function renderResults() {
+    var q = $('q').value.trim().toLowerCase(), box = $('results');
+    box.textContent = '';
+    if (q.length < 2 || !Live.swimmers) return;
+    Object.values(Live.swimmers).filter(function (s) { return s.name.toLowerCase().indexOf(q) >= 0 && followed.indexOf(s.key) < 0; })
+      .sort(function (a, b) { return a.name.localeCompare(b.name); }).slice(0, 10).forEach(function (s) {
+        var r = el('div', 'result'); var l = el('div'); l.appendChild(el('div', '', s.name)); l.appendChild(el('div', 'sub', s.club));
+        r.appendChild(l); r.appendChild(el('div', 'sub', s.races.length + (s.races.length === 1 ? ' race' : ' races')));
+        r.addEventListener('click', function () { followed.push(s.key); save(); $('q').value = ''; box.textContent = ''; render(); });
+        box.appendChild(r);
+      });
+    if (!box.firstChild) box.appendChild(el('div', 'hint', 'No one found with that name in this meet.'));
+  }
+  $('q').addEventListener('input', renderResults);
+
+  function raceCard(sw, race, showName, now) {
+    var h = Live.meet.heats[race.heatIndex], eta = Live.eta(race.heatIndex), c = el('div', 'card');
+    var status = eta ? eta.status : null, reportDue = eta && status !== 'done' && status !== 'racing' && eta.reportMs <= now;
+    if (status === 'done') c.className += ' done'; else if (status === 'racing') c.className += ' racing'; else if (reportDue) c.className += ' now'; else if (eta && eta.reportMs - now < 5 * 60000) c.className += ' soon';
+    if (showName) c.appendChild(el('div', 'who', sw.name));
+    var r = el('div', 'race', h.title);
+    if (status === 'racing') r.appendChild(el('span', 'badge racing', 'RACING'));
+    else if (status === 'done') r.appendChild(el('span', 'badge', 'DONE'));
+    else if (reportDue) r.appendChild(el('span', 'badge report', 'REPORT NOW'));
+    c.appendChild(r);
+    c.appendChild(el('div', 'where', 'Event ' + h.event + ' · Heat ' + h.heat + ' of ' + h.heatsInEvent + ' · Lane ' + race.lane));
+    var en = el('div', 'entry'); en.appendChild(document.createTextNode('Seed time ')); en.appendChild(el('b', '', race.entry || 'not listed')); c.appendChild(en);
+    var rs = Live.result(race.heatIndex, race.lane);
+    if (rs) { c.className += ' hasres'; var rr = el('div', 'entry'); rr.appendChild(document.createTextNode('Scoreboard time ')); rr.appendChild(el('b', 'rtime', rs.time)); if (rs.place) rr.appendChild(document.createTextNode(' \u00b7 place ' + rs.place)); rr.appendChild(el('span', 'unofficial', ' unofficial')); c.appendChild(rr); }
+    if (eta && eta.startMs && status !== 'done') {
+      var t = el('div', 'times');
+      var a = el('div'); a.appendChild(el('div', 'label', 'Predicted report by')); a.appendChild(el('div', 'big', ScheduleCore.clock(eta.reportMs))); a.appendChild(el('div', 'rel', ScheduleCore.relative(eta.reportMs, now)));
+      var b = el('div'); b.appendChild(el('div', 'label', 'Predicted dive in')); b.appendChild(el('div', 'big', ScheduleCore.clock(eta.startMs))); b.appendChild(el('div', 'rel', status === 'racing' ? 'in the pool now' : ScheduleCore.relative(eta.startMs, now)));
+      t.appendChild(a); t.appendChild(b); c.appendChild(t);
+      if (status !== 'racing' && eta.readyHeats) c.appendChild(el('div', 'hint', eta.fillGroup ? 'Marshalling fills up before the meet gets going.' : 'About ' + eta.readyHeats + ' heats will be ahead of yours when you report.'));
+    }
+    return c;
+  }
+
+  function render() {
+    Live.renderHeader($('title'), $('status'), $('banner'));
+    if (!Live.meet) return;
+    document.title = 'My races';
+    // chips
+    var chips = $('chips'); chips.textContent = '';
+    var swimmers = followed.map(function (k) { return Live.swimmers[k]; }).filter(Boolean);
+    followed = swimmers.map(function (s) { return s.key; });
+    swimmers.forEach(function (s) {
+      var c = el('span', 'chip', s.name + ' (' + s.club + ')'); var x = el('button', '', '×'); x.title = 'Stop following';
+      x.addEventListener('click', function () { followed = followed.filter(function (k) { return k !== s.key; }); save(); render(); });
+      c.appendChild(x); chips.appendChild(c);
+    });
+    $('chosen').textContent = '';
+    if (!swimmers.length) $('chosen').appendChild(el('div', 'hint', 'Search for your name below to see your races.'));
+
+    var now = Live.now(), races = [];
+    swimmers.forEach(function (s) { s.races.forEach(function (r) { races.push({ s: s, r: r }); }); });
+    races.sort(function (a, b) { return a.r.heatIndex - b.r.heatIndex; });
+    var box = $('races'); box.textContent = '';
+    var upcoming = races.filter(function (x) { var e = Live.eta(x.r.heatIndex); return !e || e.status !== 'done'; });
+    var done = races.filter(function (x) { var e = Live.eta(x.r.heatIndex); return e && e.status === 'done'; });
+    if (swimmers.length) box.appendChild(el('h2', '', upcoming.length ? 'Coming up' : 'No more races today'));
+    upcoming.forEach(function (x) { box.appendChild(raceCard(x.s, x.r, swimmers.length > 1, now)); });
+    if (swimmers.length && !Live.computed) box.appendChild(el('div', 'hint', 'Predicted times appear once the meet gets going.'));
+    if (done.length) { box.appendChild(el('h2', '', 'Done')); done.forEach(function (x) { box.appendChild(raceCard(x.s, x.r, swimmers.length > 1, now)); }); }
+  }
+  Live.onChange(function () { render(); });
+  // quicker updates once someone you follow is within 20 minutes of reporting (matters when the pages are on the web host)
+  Live.urgent = function () {
+    if (!Live.meet || !Live.computed || !Live.computed.valid) return false;
+    var now = Live.now();
+    return followed.some(function (k) { var sw = Live.swimmers && Live.swimmers[k]; return sw && sw.races.some(function (r) { var e = Live.eta(r.heatIndex); return e && e.status !== 'done' && e.reportMs && e.reportMs - now < 20 * 60000; }); });
+  };
+  Live.start({ role: 'athlete' });
+</script>
+</body></html>

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="/scoreboard.css">
+    <style>
+        body.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title-box purple">
+            <div id="title-line"></div>
+            <div class="subtitle" id="event-title"></div>
+        </div>
+        
+        <div class="lane-row animated" id="row-1">
+            <div class="position-number">1</div>
+            <div class="lane-num"></div>
+            <div class="lane-name"></div>
+            <div class="lane-time"></div>
+        </div>
+        
+        <div class="lane-row animated" id="row-2">
+            <div class="position-number">2</div>
+            <div class="lane-num"></div>
+            <div class="lane-name"></div>
+            <div class="lane-time"></div>
+        </div>
+        
+        <div class="lane-row animated" id="row-3">
+            <div class="position-number">3</div>
+            <div class="lane-num"></div>
+            <div class="lane-name"></div>
+            <div class="lane-time"></div>
+        </div>
+        
+        <div class="lane-row animated" id="row-4">
+            <div class="position-number">4</div>
+            <div class="lane-num"></div>
+            <div class="lane-name"></div>
+            <div class="lane-time"></div>
+        </div>
+        
+        <div class="lane-row animated" id="row-5">
+            <div class="position-number">5</div>
+            <div class="lane-num"></div>
+            <div class="lane-name"></div>
+            <div class="lane-time"></div>
+        </div>
+        
+        <div class="lane-row animated" id="row-6">
+            <div class="position-number">6</div>
+            <div class="lane-num"></div>
+            <div class="lane-name"></div>
+            <div class="lane-time"></div>
+        </div>
+        
+        <div class="lane-row animated" id="row-7">
+            <div class="position-number">7</div>
+            <div class="lane-num"></div>
+            <div class="lane-name"></div>
+            <div class="lane-time"></div>
+        </div>
+        
+        <div class="lane-row animated" id="row-8">
+            <div class="position-number">8</div>
+            <div class="lane-num"></div>
+            <div class="lane-name"></div>
+            <div class="lane-time"></div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/autoreload.js"></script>
+    <script>
+        const socket = io();
+        watchVersion(socket);
+        let resultsData = [];
+        let resultShowTime = 0;
+        let lastRaceTime = '';
+        let raceTimeChanging = 0;
+        let lastEventHeat = '';
+        const CHANGING_THRESHOLD = 2;
+        const RESULT_DISPLAY_DURATION = 5000; // Show for 5 seconds
+        
+        socket.on('scoreboard', function(data) {
+            const meetTitle = data.event_name || 'Meet';
+            const eventHeat = data.event_heat || 'Event 0 Heat 0';
+            document.getElementById('title-line').textContent = `${meetTitle} ~ ${eventHeat} ~ Result`;
+            
+            const eventTitle = data.event_title || '';
+            document.getElementById('event-title').textContent = eventTitle;
+            
+            const raceTime = data.race_time || '';
+            
+            // Reset result timer if event/heat changed
+            if (eventHeat !== lastEventHeat) {
+                resultShowTime = 0;
+                lastEventHeat = eventHeat;
+            }
+            
+            // Check if race is running
+            const isZero = !raceTime || raceTime.includes('0.0') || raceTime === '.';
+            
+            if (raceTime !== lastRaceTime && !isZero) {
+                raceTimeChanging++;
+                resultShowTime = 0; // New race started, reset timer
+            } else {
+                raceTimeChanging = 0;
+            }
+            lastRaceTime = raceTime;
+            
+            const raceRunning = (raceTimeChanging >= CHANGING_THRESHOLD);
+            
+            // Collect results - check if times are valid (not just ".")
+            const newResultsData = [];
+            let hasValidTimes = false;
+            
+            for (let lane = 1; lane <= 8; lane++) {
+                const place = data[`lane_place${lane}`];
+                const name = data[`lane_name${lane}`];
+                const time = data[`lane_time${lane}`];
+                
+                // Check if time is valid (not "." and not empty)
+                const validTime = time && time !== '.' && !time.includes('0.0') && time.length > 1;
+                
+                if (validTime) {
+                    hasValidTimes = true;
+                }
+                
+                if (place && place.trim() && name && name.trim()) {
+                    newResultsData.push({
+                        position: parseInt(place) || 99,
+                        lane: lane,
+                        name: name || '',
+                        time: validTime ? time : ''
+                    });
+                }
+            }
+            
+            // Start showing results when race stops and we have valid times
+            if (!raceRunning && isZero && hasValidTimes && newResultsData.length > 0) {
+                if (resultShowTime === 0) {
+                    // First time showing results
+                    resultsData = newResultsData;
+                    resultsData.sort((a, b) => a.position - b.position);
+                    resultShowTime = Date.now();
+                    updateDisplay();
+                }
+                
+                const timeSinceShow = Date.now() - resultShowTime;
+                
+                if (timeSinceShow < RESULT_DISPLAY_DURATION) {
+                    document.body.classList.remove('hidden');
+                    console.log('RESULT - SHOWING (', RESULT_DISPLAY_DURATION - timeSinceShow, 'ms remaining)');
+                } else {
+                    document.body.classList.add('hidden');
+                    console.log('RESULT - HIDDEN (timer expired)');
+                }
+            } else if (raceRunning) {
+                document.body.classList.add('hidden');
+                resultShowTime = 0;
+                console.log('RESULT - HIDDEN (race running)');
+            } else if (!hasValidTimes) {
+                document.body.classList.add('hidden');
+                console.log('RESULT - HIDDEN (no valid times)');
+            }
+        });
+        
+        function updateDisplay() {
+            // Clear all rows first
+            for (let i = 1; i <= 8; i++) {
+                const row = document.getElementById(`row-${i}`);
+                row.classList.remove('visible');
+                const cells = row.querySelectorAll('div');
+                cells[1].textContent = '';
+                cells[2].textContent = '';
+                cells[3].textContent = '';
+            }
+            
+            // Populate with results
+            setTimeout(() => {
+                resultsData.forEach((result, index) => {
+                    if (index < 8) {
+                        const row = document.getElementById(`row-${index + 1}`);
+                        const cells = row.querySelectorAll('div');
+                        
+                        cells[1].textContent = result.lane;
+                        cells[2].textContent = result.name;
+                        cells[3].textContent = result.time;
+                        
+                        // Animate in with stagger
+                        setTimeout(() => {
+                            row.classList.add('visible');
+                        }, index * 100);
+                    }
+                });
+            }, 100);
+        }
+    </script>
+</body>
+</html>

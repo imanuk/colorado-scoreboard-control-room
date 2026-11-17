@@ -1,0 +1,267 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Transition Test</title>
+<link rel="stylesheet" href="/scoreboard.css">
+<style>
+  body { padding: 0; background: #f4f4f4; overflow: visible; font-family: -apple-system, sans-serif; }
+  #controls {
+    width: 800px;
+    margin: 0 auto 16px;
+    padding: 14px 18px;
+    background: #1c2127;
+    color: #d7e1ea;
+    border-radius: 10px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  #controls h1 { font-size: 15px; margin: 0 20px 0 0; color: #fff; }
+  #controls select, #controls button, #controls input[type=number] {
+    background: #262c33; color: #d7e1ea; border: 1px solid #333b44;
+    border-radius: 6px; padding: 5px 8px; font-size: 12.5px; cursor: pointer;
+  }
+  #controls input[type=number] { cursor: text; }
+  #controls label { display: flex; align-items: center; gap: 6px; }
+  #controls input[type=range] { width: 110px; }
+  #stage-wrap { width: 800px; margin: 0 auto; position: relative; }
+  .container { position: relative; --dur: 1800ms; --ease: cubic-bezier(0.65, 0, 0.35, 1); }
+  .lane-row { position: relative; overflow: hidden; }
+
+  /* Both the outgoing and incoming name occupy the same slot; JS toggles
+     which transition class is active on the row while swapping text. Each
+     row gets its own --delay (set inline) so rows animate in a staggered
+     wave instead of one synchronised blip. */
+  .lane-name-slot { position: relative; flex: 1; min-width: 0; height: 44px; }
+  .lane-name-slot .name-layer {
+    position: absolute; inset: 0;
+    display: flex; align-items: center;
+    color: #FFFFFF; font-size: 36px; font-weight: normal;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    will-change: transform, opacity;
+  }
+  .name-layer.outgoing { z-index: 2; }
+  .name-layer.incoming { z-index: 1; opacity: 0; }
+
+  /* --- Style: crossfade --- */
+  .style-crossfade .name-layer { transition: opacity var(--dur) var(--ease) var(--delay, 0ms); }
+  .style-crossfade .name-layer.outgoing.leaving { opacity: 0; }
+  .style-crossfade .name-layer.incoming.entering { opacity: 1; }
+
+  /* --- Style: shrink/grow (with a little vertical drift so it reads as
+     motion, not an in-place pulse) --- */
+  .style-shrinkgrow .name-layer { transition: opacity var(--dur) var(--ease) var(--delay, 0ms), transform var(--dur) var(--ease) var(--delay, 0ms); transform-origin: left center; }
+  .style-shrinkgrow .name-layer.outgoing { transform: scale(1) translateY(0); }
+  .style-shrinkgrow .name-layer.outgoing.leaving { opacity: 0; transform: scale(0.55) translateY(10px); }
+  .style-shrinkgrow .name-layer.incoming { transform: scale(0.55) translateY(-10px); }
+  .style-shrinkgrow .name-layer.incoming.entering { opacity: 1; transform: scale(1) translateY(0); }
+
+  /* --- Style: slide toward time --- */
+  .style-slide .name-layer { transition: opacity var(--dur) var(--ease) var(--delay, 0ms), transform var(--dur) var(--ease) var(--delay, 0ms); }
+  .style-slide .name-layer.outgoing { transform: translateX(0); }
+  .style-slide .name-layer.outgoing.leaving { opacity: 0; transform: translateX(220px); }
+  .style-slide .name-layer.incoming { transform: translateX(-60px); opacity: 0; }
+  .style-slide .name-layer.incoming.entering { opacity: 1; transform: translateX(0); }
+
+  #phase-banner {
+    width: 800px; margin: 12px auto 0; text-align: center;
+    font-size: 12.5px; color: #8a97a3; font-family: -apple-system, sans-serif;
+  }
+  #phase-banner b { color: #34c759; }
+  #phase-banner.holding b { color: #ffb020; }
+</style>
+</head>
+<body>
+<div id="controls">
+  <h1>Transition Test</h1>
+  <label>Style
+    <select id="style-select">
+      <option value="crossfade">Crossfade</option>
+      <option value="shrinkgrow" selected>Shrink out / grow in</option>
+      <option value="slide">Slide toward time</option>
+    </select>
+  </label>
+  <label>Duration
+    <input type="range" id="dur-slider" min="200" max="8000" step="100" value="2500">
+    <input type="number" id="dur-number" min="200" max="8000" step="100" value="2500" style="width:64px;">ms
+  </label>
+  <label>Stagger
+    <input type="range" id="stagger-slider" min="0" max="600" step="20" value="0">
+    <input type="number" id="stagger-number" min="0" max="600" step="20" value="0" style="width:56px;">ms/row
+  </label>
+  <label><input type="checkbox" id="auto-cycle"> auto-cycle</label>
+  <button id="trigger-btn">Trigger transition now</button>
+</div>
+
+<div id="stage-wrap">
+  <div class="container style-shrinkgrow" id="stage">
+    <div class="title-box purple">
+      <div id="title-line"></div>
+      <div class="subtitle" id="event-title"></div>
+    </div>
+    <div class="lane-row" id="row-1"><div class="lane-num"></div><div class="lane-name-slot"><div class="name-layer outgoing"></div><div class="name-layer incoming"></div></div><div class="lane-time"></div><div class="position-number"></div></div>
+    <div class="lane-row" id="row-2"><div class="lane-num"></div><div class="lane-name-slot"><div class="name-layer outgoing"></div><div class="name-layer incoming"></div></div><div class="lane-time"></div><div class="position-number"></div></div>
+    <div class="lane-row" id="row-3"><div class="lane-num"></div><div class="lane-name-slot"><div class="name-layer outgoing"></div><div class="name-layer incoming"></div></div><div class="lane-time"></div><div class="position-number"></div></div>
+    <div class="lane-row" id="row-4"><div class="lane-num"></div><div class="lane-name-slot"><div class="name-layer outgoing"></div><div class="name-layer incoming"></div></div><div class="lane-time"></div><div class="position-number"></div></div>
+  </div>
+</div>
+<div id="phase-banner">ready</div>
+<div style="width:800px;margin:8px auto 0;text-align:center;font-size:11.5px;color:#b0bac4;font-family:-apple-system,sans-serif;">
+  Preview uses a shortened 1.5s hold for faster iteration - the real hold is 5s (or until the next race starts).
+  Duration/stagger sliders only affect the transition itself.
+</div>
+
+<script>
+const HEATS = [
+  { heat: 'Event 101 Heat 3', title: '100m Freestyle', swimmers: [
+    ['Sam EXAMPLE','10:55.96','1'], ['Jo SAMPLE','11:11.85','2'],
+    ['Max DEMO','12:09.84','3'], ['Lee TESTER','14:24.99','4'] ] },
+  { heat: 'Event 101 Heat 4', title: '100m Freestyle', swimmers: [
+    ['Ali ONE','10:11.75',''], ['Kit TWO','11:19.41',''],
+    ['Sky THREE','12:00.86',''], ['Tom FOUR','12:03.68',''] ] },
+  { heat: 'Event 205 Heat 1', title: '', swimmers: [
+    ['Alexandra Silva','',''], ["F O'Neill",'',''],
+    ['A Treffny','',''], ['Sienna Hardiman','',''] ] },
+];
+
+const stage = document.getElementById('stage');
+const styleSelect = document.getElementById('style-select');
+const durSlider = document.getElementById('dur-slider');
+const durNumber = document.getElementById('dur-number');
+const staggerSlider = document.getElementById('stagger-slider');
+const staggerNumber = document.getElementById('stagger-number');
+const autoCycle = document.getElementById('auto-cycle');
+const triggerBtn = document.getElementById('trigger-btn');
+const banner = document.getElementById('phase-banner');
+
+let heatIndex = 0;
+let cycleTimer = null;
+let transitionInFlight = false;
+
+// Keep a range + number input pair in sync both ways, and run a callback
+// whenever the value changes from either one.
+function linkPair(range, number, onChange) {
+  range.addEventListener('input', () => { number.value = range.value; onChange(); });
+  number.addEventListener('input', () => {
+    const clamped = Math.min(Number(number.max), Math.max(Number(number.min), Number(number.value) || 0));
+    range.value = clamped;
+    onChange();
+  });
+}
+
+function applyStyle() {
+  stage.className = 'container style-' + styleSelect.value;
+  applyDuration();
+}
+styleSelect.addEventListener('change', applyStyle);
+
+function applyDuration() {
+  stage.style.setProperty('--dur', durSlider.value + 'ms');
+}
+linkPair(durSlider, durNumber, applyDuration);
+applyDuration();
+
+function applyStagger() {
+  for (let lane = 1; lane <= 4; lane++) {
+    const row = document.getElementById(`row-${lane}`);
+    const delay = (lane - 1) * Number(staggerSlider.value);
+    row.querySelectorAll('.name-layer').forEach(el => el.style.setProperty('--delay', delay + 'ms'));
+  }
+}
+linkPair(staggerSlider, staggerNumber, applyStagger);
+applyStagger();
+applyStyle();
+
+function renderHeat(idx, rowSelector) {
+  const h = HEATS[idx];
+  document.getElementById('title-line').textContent = `Last Gasp 2026 ~ ${h.heat}`;
+  document.getElementById('event-title').textContent = h.title;
+  for (let lane = 1; lane <= 4; lane++) {
+    const row = document.getElementById(`row-${lane}`);
+    const sw = h.swimmers[lane - 1];
+    row.querySelector('.lane-num').textContent = lane;
+    row.querySelector(rowSelector).textContent = sw[0];
+    row.querySelector('.lane-time').textContent = sw[1];
+    row.querySelector('.position-number').textContent = sw[2];
+  }
+}
+
+// Initial render: both layers show the same (first) heat, incoming invisible
+renderHeat(0, '.outgoing');
+renderHeat(0, '.incoming');
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Total time the transition itself needs to fully settle: the animation
+// duration plus the longest row's stagger delay.
+function transitionTotalMs() {
+  return Number(durSlider.value) + 3 * Number(staggerSlider.value);
+}
+
+async function playTransition() {
+  // Guard against overlapping runs - e.g. clicking "trigger" manually while
+  // an auto-cycle transition is still mid-flight. Without this, two
+  // concurrent transitions stomp on the same DOM/heatIndex and produce
+  // exactly the kind of erratic double-pulse this page is meant to avoid.
+  if (transitionInFlight) return;
+  transitionInFlight = true;
+
+  const nextIndex = (heatIndex + 1) % HEATS.length;
+
+  banner.textContent = 'showing outgoing heat (held)';
+  banner.classList.add('holding');
+  await sleep(1500); // shortened stand-in for the real 5s hold, for faster preview
+
+  // Load the next heat's names into the incoming layer only (still
+  // invisible) - title/heat header stays on the OLD heat until the swap
+  // below, same as the names, so the whole display changes together.
+  for (let lane = 1; lane <= 4; lane++) {
+    const row = document.getElementById(`row-${lane}`);
+    row.querySelector('.incoming').textContent = HEATS[nextIndex].swimmers[lane - 1][0];
+  }
+
+  banner.textContent = 'transitioning...';
+  document.querySelectorAll('.name-layer.outgoing').forEach(el => el.classList.add('leaving'));
+  document.querySelectorAll('.name-layer.incoming').forEach(el => el.classList.add('entering'));
+
+  await sleep(transitionTotalMs());
+
+  // Swap: incoming becomes the new outgoing (reset transform/opacity via class swap)
+  document.getElementById('title-line').textContent = `Last Gasp 2026 ~ ${HEATS[nextIndex].heat}`;
+  document.getElementById('event-title').textContent = HEATS[nextIndex].title;
+  for (let lane = 1; lane <= 4; lane++) {
+    const row = document.getElementById(`row-${lane}`);
+    row.querySelector('.lane-time').textContent = HEATS[nextIndex].swimmers[lane - 1][1];
+    row.querySelector('.position-number').textContent = HEATS[nextIndex].swimmers[lane - 1][2];
+    const outgoing = row.querySelector('.outgoing');
+    const incoming = row.querySelector('.incoming');
+    outgoing.textContent = incoming.textContent;
+  }
+  document.querySelectorAll('.name-layer.outgoing').forEach(el => el.classList.remove('leaving'));
+  document.querySelectorAll('.name-layer.incoming').forEach(el => el.classList.remove('entering'));
+
+  heatIndex = nextIndex;
+  banner.classList.remove('holding');
+  banner.textContent = 'settled on new heat';
+  transitionInFlight = false;
+}
+
+triggerBtn.addEventListener('click', () => { playTransition(); });
+
+function scheduleAutoCycle() {
+  if (cycleTimer) clearTimeout(cycleTimer);
+  if (!autoCycle.checked) return;
+  cycleTimer = setTimeout(async () => {
+    await playTransition();
+    scheduleAutoCycle();
+  }, 1200);
+}
+autoCycle.addEventListener('change', scheduleAutoCycle);
+scheduleAutoCycle();
+</script>
+<script src="/backlink.js"></script>
+</body>
+</html>

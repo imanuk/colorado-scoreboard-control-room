@@ -1,0 +1,7 @@
+{
+  "rootFolderId": "PUT-YOUR-GOOGLE-DRIVE-FOLDER-ID-HERE",
+  "ignoreFolders": ["Past"],
+  "reportsFolderName": "reports",
+  "scoreboardFilePattern": "_SCB\\.TXT$",
+  "pollMs": 120000
+}

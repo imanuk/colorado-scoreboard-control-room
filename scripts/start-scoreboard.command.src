@@ -1,0 +1,57 @@
+#!/bin/bash
+# Desktop launcher: starts the scoreboard server under launchd supervision
+# (so it auto-restarts if it crashes) and opens the browser to the menu page.
+# Safe to double-click again while it's already running - it won't restart
+# a healthy process, just opens the browser.
+
+PROJECT_DIR="__PROJECT_DIR__"
+LABEL="__LABEL__"
+PLIST_PATH="$PROJECT_DIR/scripts/$LABEL.plist"
+UID_GUI="gui/$(id -u)"
+PORT=8080
+
+echo "Colorado Scoreboard - Start"
+echo "----------------------------"
+
+if [ ! -f "$PLIST_PATH" ]; then
+    echo "ERROR: $PLIST_PATH not found."
+    echo "Run scripts/install.sh once first (see README.md)."
+    read -n 1 -s -r -p "Press any key to close..."
+    exit 1
+fi
+
+if launchctl print "$UID_GUI/$LABEL" >/dev/null 2>&1; then
+    echo "Already running under launchd - leaving it as-is."
+else
+    echo "Loading launchd service..."
+    launchctl bootstrap "$UID_GUI" "$PLIST_PATH"
+fi
+
+echo "Waiting for the server to respond on port $PORT..."
+for i in $(seq 1 30); do
+    if curl -s -o /dev/null "http://localhost:$PORT/"; then
+        echo "Server is up."
+        break
+    fi
+    sleep 1
+    if [ "$i" -eq 30 ]; then
+        echo "WARNING: server did not respond after 30s - check logs in $PROJECT_DIR/logs/"
+    fi
+done
+
+# Pick the meet (loads its scoreboard file from the shared Google Drive
+# folder). Enter takes the newest; never blocks the launch if Drive is
+# unreachable.
+echo ""
+NODE_BIN="__NODE_PATH__"
+[ -x "$NODE_BIN" ] || NODE_BIN="$(command -v node)"
+SCOREBOARD_PORT=$PORT "$NODE_BIN" "$PROJECT_DIR/scripts/choose-meet.js"
+echo ""
+
+open "http://localhost:$PORT/"
+
+echo ""
+echo "Done. This window can be closed - the server keeps running in the"
+echo "background under launchd, and will auto-restart if it ever crashes."
+echo "Use 'Stop Scoreboard.command' to stop it."
+sleep 2

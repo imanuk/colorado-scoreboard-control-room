@@ -1,0 +1,8 @@
+{
+  "friendlyName": "scoreboard",
+  "extraPorts": [80],
+  "maxLiveViewers": 3,
+  "liveViewMaxMbps": 12,
+  "allowRemoteControl": false,
+  "remoteControlPin": ""
+}

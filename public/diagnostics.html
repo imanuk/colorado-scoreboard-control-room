@@ -1,0 +1,324 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Scoreboard Diagnostics</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #12181f;
+    --border: #232b33;
+    --text: #d7e1ea;
+    --dim: #7c8a97;
+    --green: #34c759;
+    --red: #ff453a;
+    --amber: #ffb020;
+    --accent: #3b82f6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  header h1 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+    font-family: -apple-system, sans-serif;
+  }
+  header a {
+    color: var(--dim);
+    text-decoration: none;
+    font-size: 12px;
+  }
+  header a:hover { color: var(--accent); }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #1c2530;
+    font-size: 11.5px;
+  }
+  .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
+  .pill.ok .dot { background: var(--green); }
+  .pill.bad .dot { background: var(--red); }
+  .spacer { flex: 1; }
+  main {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    height: calc(100vh - 41px);
+  }
+  .panel {
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .panel-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--dim);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .panel-head .spacer { flex: 1; }
+  .panel-head button, .panel-head label {
+    background: #1c2530;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 5px;
+    padding: 2px 8px;
+    font-size: 10.5px;
+    cursor: pointer;
+    text-transform: none;
+    letter-spacing: normal;
+    font-family: inherit;
+  }
+  .panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 10px;
+  }
+  .log-line { padding: 2px 0; border-bottom: 1px solid #171d24; white-space: pre-wrap; word-break: break-all; }
+  .log-line .ts { color: var(--dim); margin-right: 8px; }
+  .log-line .desc { color: var(--accent); margin-right: 8px; }
+  .log-line .text { color: var(--text); }
+  .log-line .hex { display: block; color: #56636f; margin-top: 1px; }
+  .issue-line.warn { color: var(--amber); }
+  .issue-line.error { color: var(--red); }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 2px 6px; border-bottom: 1px solid #171d24; }
+  th { color: var(--dim); font-weight: 500; position: sticky; top: 0; background: var(--bg); }
+  #status-body div, #heatsheet-body div { padding: 3px 0; }
+  #status-body .label, #heatsheet-body .label { color: var(--dim); display: inline-block; width: 130px; }
+  .empty { color: var(--dim); padding: 8px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Scoreboard Diagnostics</h1>
+  <span id="link-pill" class="pill bad"><span class="dot"></span><span id="link-text">connecting...</span></span>
+  <div class="spacer"></div>
+  <label for="rate-slider" style="color: var(--dim); font-size: 11.5px;">update rate</label>
+  <input type="range" id="rate-slider" min="20" max="500" step="10" value="50" style="width: 120px;">
+  <span id="rate-value" class="pill">50ms (20Hz)</span>
+  <a href="/control.html">&larr; Control room</a>
+</header>
+<main>
+  <div class="panel" style="grid-row: 1 / 3;">
+    <div class="panel-head">
+      Packet log (named datapoints)
+      <div class="spacer"></div>
+      <label><input type="checkbox" id="raw-toggle"> show raw bytes (all)</label>
+      <button id="pause-btn">pause</button>
+      <button id="save-btn">save log</button>
+      <button id="clear-btn">clear</button>
+    </div>
+    <div class="panel-body" id="packet-log"><div class="empty">Waiting for packets…</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">Connection</div>
+    <div class="panel-body" id="status-body"></div>
+    <div class="panel-head" style="border-top:1px solid var(--border);">Heat sheet backup files</div>
+    <div class="panel-body" id="heatsheet-body"><div class="empty">none loaded</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">Recent issues</div>
+    <div class="panel-body" id="issue-log"><div class="empty">No warnings or errors yet.</div></div>
+  </div>
+
+  <div class="panel" style="grid-column: 2; grid-row: 2;">
+    <div class="panel-head">Live channel table (module &rarr; digits)</div>
+    <div class="panel-body">
+      <table>
+        <thead><tr><th>Module</th><th>Digits</th></tr></thead>
+        <tbody id="module-table"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script src="/socket.io/socket.io.js"></script>
+    <script src="/autoreload.js"></script>
+<script>
+const socket = io();
+        watchVersion(socket);
+
+const packetLogEl = document.getElementById('packet-log');
+const issueLogEl = document.getElementById('issue-log');
+const statusBodyEl = document.getElementById('status-body');
+const moduleTableEl = document.getElementById('module-table');
+const linkPill = document.getElementById('link-pill');
+const linkText = document.getElementById('link-text');
+const rawToggle = document.getElementById('raw-toggle');
+const pauseBtn = document.getElementById('pause-btn');
+const saveBtn = document.getElementById('save-btn');
+const clearBtn = document.getElementById('clear-btn');
+const rateSlider = document.getElementById('rate-slider');
+const rateValue = document.getElementById('rate-value');
+
+function fmtRate(ms) {
+  const hz = (1000 / ms);
+  return `${ms}ms (${hz % 1 === 0 ? hz : hz.toFixed(1)}Hz)`;
+}
+
+let paused = false;
+let packetLines = []; // kept for "save log"
+const MAX_DOM_LINES = 500;
+
+function fmtTime(ts) {
+  const d = new Date(ts);
+  return d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0');
+}
+
+function appendLine(container, html, plainText) {
+  if (paused) return;
+  const wasEmpty = container.querySelector('.empty');
+  if (wasEmpty) container.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = 'log-line';
+  div.innerHTML = html;
+  const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 20;
+  container.appendChild(div);
+  while (container.children.length > MAX_DOM_LINES) container.removeChild(container.firstChild);
+  if (atBottom) container.scrollTop = container.scrollHeight;
+  if (plainText !== undefined) {
+    packetLines.push(plainText);
+    if (packetLines.length > 5000) packetLines.shift();
+  }
+}
+
+function renderPacket(p) {
+  const html = `<span class="ts">${fmtTime(p.ts)}</span><span class="desc">${p.desc}</span><span class="text">${p.text || ''}</span>${rawToggle.checked ? `<span class="hex">${p.hex}</span>` : ''}`;
+  appendLine(packetLogEl, html, `${fmtTime(p.ts)} ${p.desc} ${p.text || ''} | ${p.hex}`);
+}
+
+function renderRaw(r) {
+  if (!rawToggle.checked) return;
+  const html = `<span class="ts">${fmtTime(r.ts)}</span><span class="desc">RAW ${r.byteCount}B</span><span class="hex">${r.hex}</span>`;
+  appendLine(packetLogEl, html, `${fmtTime(r.ts)} RAW ${r.byteCount}B | ${r.hex}`);
+}
+
+function renderIssue(line) {
+  const wasEmpty = issueLogEl.querySelector('.empty');
+  if (wasEmpty) issueLogEl.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = `log-line issue-line ${line.level}`;
+  div.textContent = `${line.ts}  [${line.level.toUpperCase()}]  ${line.message}${line.context ? ' ' + JSON.stringify(line.context) : ''}`;
+  issueLogEl.appendChild(div);
+  while (issueLogEl.children.length > 200) issueLogEl.removeChild(issueLogEl.firstChild);
+  issueLogEl.scrollTop = issueLogEl.scrollHeight;
+}
+
+let lastKnownCandidatePorts = [];
+
+function renderStatus(status) {
+  if (status.candidatePorts && status.candidatePorts.length) {
+    lastKnownCandidatePorts = status.candidatePorts;
+  }
+  const connected = !!status.connected;
+  linkPill.className = 'pill ' + (connected ? 'ok' : 'bad');
+  linkText.textContent = connected ? 'connected' : 'disconnected';
+  const ageMs = status.lastDataAt ? Date.now() - status.lastDataAt : null;
+  statusBodyEl.innerHTML = `
+    <div><span class="label">State</span>${connected ? 'CONNECTED' : 'DISCONNECTED'}</div>
+    <div><span class="label">Active port</span>${status.path || '(none)'}</div>
+    <div><span class="label">Last data</span>${ageMs !== null ? (ageMs / 1000).toFixed(1) + 's ago' : 'n/a'}</div>
+    <div><span class="label">Candidate ports</span>${lastKnownCandidatePorts.join(', ') || '(none seen)'}</div>
+  `;
+}
+
+socket.on('connect', () => {
+  linkText.textContent = 'connected to server, waiting for link status…';
+  socket.emit('diag:subscribe');
+});
+
+socket.on('diag:packetHistory', (list) => { list.forEach(renderPacket); });
+socket.on('diag:rawHistory', (list) => { list.forEach(renderRaw); });
+socket.on('diag:issueHistory', (list) => { list.forEach(renderIssue); });
+socket.on('diag:packet', renderPacket);
+socket.on('diag:raw', renderRaw);
+socket.on('diag:issue', renderIssue);
+socket.on('diag:status', renderStatus);
+socket.on('diag:heatsheets', (status) => {
+  const el = document.getElementById('heatsheet-body');
+  if (!status.files || status.files.length === 0) {
+    el.innerHTML = '<div class="empty">none loaded - drop a .txt file into heatsheets/</div>';
+    return;
+  }
+  el.innerHTML = `<div><span class="label">Files</span>${status.files.join(', ')}</div><div><span class="label">Events found</span>${status.eventCount}</div>`;
+});
+socket.on('scoreboard', (data) => {
+  renderStatus({
+    connected: data.serial_connected,
+    path: data.serial_port,
+    lastDataAt: data.serial_last_data_ms,
+    candidatePorts: []
+  });
+});
+
+socket.on('diag:modules', (modules) => {
+  moduleTableEl.innerHTML = modules.map(m => `<tr><td>${m.module}</td><td>${m.digits.replace(/</g,'&lt;')}</td></tr>`).join('') ||
+    '<tr><td colspan="2" class="empty">No populated modules yet</td></tr>';
+});
+
+pauseBtn.addEventListener('click', () => {
+  paused = !paused;
+  pauseBtn.textContent = paused ? 'resume' : 'pause';
+});
+
+clearBtn.addEventListener('click', () => {
+  packetLogEl.innerHTML = '<div class="empty">Cleared.</div>';
+  packetLines = [];
+});
+
+saveBtn.addEventListener('click', () => {
+  const blob = new Blob([packetLines.join('\n')], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `scoreboard-raw-log-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+// Live-adjustable server update rate: label updates as you drag, the change
+// is sent to the server (and applied immediately, no restart) on release.
+rateSlider.addEventListener('input', () => {
+  rateValue.textContent = fmtRate(Number(rateSlider.value));
+});
+rateSlider.addEventListener('change', () => {
+  socket.emit('diag:setUpdateRate', Number(rateSlider.value));
+});
+socket.on('diag:updateRate', (ms) => {
+  rateSlider.value = ms;
+  rateValue.textContent = fmtRate(ms);
+});
+
+</script>
+</body>
+</html>

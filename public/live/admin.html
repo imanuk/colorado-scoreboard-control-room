@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en-GB">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Live heat sheet - admin</title><link rel="stylesheet" href="live.css">
+<style> label { display:block; margin:12px 0 4px; font-size:14px; } .f { display:grid; grid-template-columns: 1fr 120px; gap:10px; align-items:center; margin:8px 0; } .f input, .f select { padding:8px 10px; font-size:16px; } #msg { margin-top:10px; font-size:14px; }</style></head>
+<body><div class="wrap">
+<header><h1>Live heat sheet - admin</h1><div class="status" id="status"></div><div class="banner" id="banner"></div></header>
+<div class="card">
+  <h2 style="margin-top:0">How the times are worked out</h2>
+  <div class="f"><label>Gap between heats (seconds)</label><input type="number" id="gapSeconds" min="0"></div>
+  <div class="f"><label>Gap between backstroke heats (seconds) - used instead of the normal gap, not added to it</label><input type="number" id="backstrokeGapSeconds" min="0"></div>
+  <div class="f"><label>Heat length if nobody in it has a time and no later heat in the same event does (seconds)</label><input type="number" id="defaultHeatSeconds" min="10"></div>
+  <div class="f"><label>Extra seconds added when a heat with no times borrows its length from a later heat in the same event</label><input type="number" id="borrowedExtraSeconds" min="0"></div>
+  <h2>When the meet starts</h2>
+  <div class="f"><label>Expected start of the first heat (used until the first race really starts; clear it to switch off)</label><input type="time" id="meetStartTime"></div>
+  <div class="f"><label>The first heats all report this many minutes before then</label><input type="number" id="fillLeadMinutes" min="0" max="120"></div>
+  <h2>What people are shown</h2>
+  <div class="f"><label>Show the scoreboard's time for finished races (unofficial)</label><select id="showTimes"><option value="true">Yes</option><option value="false">No</option></select></div>
+  <div class="f"><label>Don't ask swimmers to report more than this many minutes before their dive-in</label><input type="number" id="reportLeadMinutes" min="0"></div>
+  <div class="f"><label>Always keep at least this many heats at marshalling, however long they are</label><input type="number" id="minHeatsReady" min="1" max="20"></div>
+  <div class="f"><label>Most heats marshalling can hold (the number of marshal positions)</label><input type="number" id="heatsAhead" min="1" max="99"></div>
+  <div class="f"><label>Marshal screens move on when the race</label><select id="marshalAdvanceOn"><option value="start">starts</option><option value="finish">finishes</option></select></div>
+  <h2>How often phones ask for news (only when the pages are on the web host)</h2>
+  <div class="f"><label>Marshals (seconds)</label><input type="number" id="pollMarshalSeconds" min="2"></div>
+  <div class="f"><label>Team managers (seconds)</label><input type="number" id="pollTeamSeconds" min="10"></div>
+  <div class="f"><label>Swimmers and parents (seconds)</label><input type="number" id="pollAthleteSeconds" min="10"></div>
+  <div class="f"><label>Whole-meet and front page (seconds)</label><input type="number" id="pollMeetSeconds" min="10"></div>
+  <button id="save" class="on">Save</button> <button id="reset">Back to defaults</button>
+  <div id="msg" class="hint"></div>
+</div>
+<div class="card">
+  <h2 style="margin-top:0">Web host</h2>
+  <div id="pubInfo" class="hint">Checking...</div>
+  <div style="margin-top:10px"><button id="pubTest">Test connection</button> <button id="pubMeet">Send the draw again</button> <button id="pubWipe">Remove published data</button> <button id="pubResume">Start publishing again</button></div>
+  <div id="pubMsg" class="hint"></div>
+</div>
+<div class="card"><h2 style="margin-top:0">Scoreboard times</h2>
+  <div class="hint">Taken from the console as each race finishes and shown to swimmers and parents as unofficial. Test races you run on the console before the meet will be in here too - clear them before the meet starts.</div>
+  <div id="resCount" class="hint"></div>
+  <div style="margin-top:8px"><button id="resClear">Clear all scoreboard times</button></div>
+</div>
+<div class="card"><h2 style="margin-top:0">Right now</h2><div id="now" class="hint"></div></div>
+<div class="hint">Pages for everyone else: <a href="index.html">index</a>, <a href="athlete.html">swimmer</a>, <a href="team.html">team manager</a>, <a href="marshal.html">marshal</a>. This admin page only works on the scoreboard Mac.</div>
+</div>
+<script src="/socket.io/socket.io.js"></script><script src="/autoreload.js"></script><script src="schedule-core.js"></script><script src="live-client.js"></script>
+<script>
+  var $ = function (id) { return document.getElementById(id); };
+  var IDS = ['gapSeconds', 'backstrokeGapSeconds', 'defaultHeatSeconds', 'borrowedExtraSeconds', 'reportLeadMinutes', 'minHeatsReady', 'fillLeadMinutes', 'meetStartTime', 'showTimes', 'heatsAhead', 'marshalAdvanceOn', 'pollMarshalSeconds', 'pollTeamSeconds', 'pollAthleteSeconds', 'pollMeetSeconds'], filled = false;
+  function fill() { IDS.forEach(function (k) { $(k).value = String(Live.settings[k]); }); filled = true; }
+  function render() {
+    Live.renderHeader({}, $('status'), $('banner'));
+    if (Live.meet && !filled) fill();
+    var n = $('now'); n.textContent = '';
+    if (!Live.meet) return;
+    n.appendChild(document.createTextNode(Live.meet.heats.length + ' heats in the draw. '));
+    if (Live.computed && Live.computed.valid) {
+      var last = Live.computed.etas[Live.computed.etas.length - 1];
+      n.appendChild(document.createTextNode('Estimated finish of the last heat: ' + ScheduleCore.clock(last.endMs) + ' (' + ScheduleCore.relative(last.endMs, Live.now()) + ').'));
+    } else n.appendChild(document.createTextNode('The console is not on a heat in this draw yet.'));
+  }
+  $('save').addEventListener('click', function () {
+    var body = {}; IDS.forEach(function (k) { body[k] = (k === 'marshalAdvanceOn' || k === 'meetStartTime') ? $(k).value : (k === 'showTimes' ? $(k).value === 'true' : Number($(k).value)); });
+    fetch('/api/live/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (x) { $('msg').textContent = x.ok ? 'Saved. Everyone\'s screens update straight away.' : (x.j.error || 'Could not save.'); if (x.ok) fill(); });
+  });
+  $('reset').addEventListener('click', function () { var d = ScheduleCore.DEFAULTS; IDS.forEach(function (k) { $(k).value = d[k]; }); $('msg').textContent = 'Defaults filled in - press Save to apply.'; });
+  function ago(ms) { if (!ms) return 'never'; var s = Math.round((Date.now() - ms) / 1000); return s < 90 ? s + ' s ago' : Math.round(s / 60) + ' min ago'; }
+  function pubRefresh() {
+    fetch('/api/live/publish').then(function (r) { return r.json(); }).then(function (p) {
+      var t;
+      if (p.enabled) t = 'Publishing to ' + p.host + '. Last successful send ' + ago(p.lastOkAt) + (p.failures ? ' - failing (' + p.failures + ' tries): ' + p.lastError : '') + '.';
+      else t = 'Not publishing. ' + (p.lastError || 'Run scripts/build-remote.js --url https://your-site/heats/ once, upload the folder it makes, then press "Start publishing again".');
+      $('pubInfo').textContent = t;
+    }).catch(function () { $('pubInfo').textContent = 'Could not read the publishing status.'; });
+  }
+  function pubPost(what, ask) {
+    if (ask && !confirm(ask)) return;
+    $('pubMsg').textContent = 'Working...';
+    fetch('/api/live/publish/' + what, { method: 'POST' }).then(function (r) { return r.json(); }).then(function (j) {
+      $('pubMsg').textContent = j.ok === false ? 'Problem: ' + (j.error || 'failed') : (what === 'test' ? 'Connected. The host runs PHP ' + j.php + (j.writable ? ' and can store the data.' : ' but cannot write its data folder - check the folder permissions.') : 'Done.');
+      pubRefresh();
+    }).catch(function () { $('pubMsg').textContent = 'Could not reach the scoreboard.'; });
+  }
+  $('pubTest').addEventListener('click', function () { pubPost('test'); });
+  $('pubMeet').addEventListener('click', function () { pubPost('send-meet'); });
+  $('pubResume').addEventListener('click', function () { pubPost('resume'); });
+  $('pubWipe').addEventListener('click', function () { pubPost('wipe', 'Remove every name and time from the web site and stop publishing? Do this after the meet.'); });
+  function resRefresh() { fetch('/api/live/results').then(function (r) { return r.json(); }).then(function (d) { var heats = Object.keys(d.heats || {}).length; $('resCount').textContent = heats ? heats + ' heat' + (heats === 1 ? '' : 's') + ' with scoreboard times.' : 'No scoreboard times yet.'; }); }
+  $('resClear').addEventListener('click', function () { if (!confirm('Remove every scoreboard time from the pages?')) return; fetch('/api/live/results/clear', { method: 'POST' }).then(resRefresh); });
+  resRefresh(); setInterval(resRefresh, 5000);
+  pubRefresh(); setInterval(pubRefresh, 5000);
+  Live.onChange(render); Live.start();
+</script>
+<script src="/backlink.js"></script>
+</body></html>

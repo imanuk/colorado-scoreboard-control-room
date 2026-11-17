@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en-GB">
+<head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Team manager</title><link rel="stylesheet" href="live.css"></head>
+<body><div class="wrap" style="max-width:900px">
+<header><h1 id="title">Whole club</h1><div class="status" id="status"></div><div class="banner" id="banner"></div></header>
+<div class="seg"><a href="athlete.html">My swimmers</a><a class="on" href="team.html">Whole club</a><a href="wholemeet.html">Whole meet</a></div>
+<div class="row" style="margin-bottom:10px">
+  <div style="flex:1;min-width:200px"><select id="club"></select></div>
+  <div style="flex:1;min-width:160px"><input type="text" id="q" placeholder="Filter by swimmer's name" autocomplete="off"></div>
+  <button id="hideDone">Hide finished</button>
+</div>
+<div class="tickbar" id="tickbar"></div>
+<div id="list"></div>
+<div class="hint" style="margin-top:18px">Sorted by when each swimmer must report to marshalling. All times are predictions and correct themselves as each race starts. Scoreboard times are copied from the timing console as each race finishes - they are not official, and officials can change or overrule them. <a href="index.html">Other views</a></div>
+</div>
+<script src="/socket.io/socket.io.js"></script><script src="/autoreload.js"></script><script src="live-config.js"></script><script src="schedule-core.js"></script><script src="live-client.js"></script>
+<script>
+  var $ = function (id) { return document.getElementById(id); };
+  function get(k, d) { try { var v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }
+  function put(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  var club = get('team.club', ''), hideDone = get('team.hideDone', '1') === '1', built = false;
+
+  function buildClubs() {
+    var sel = $('club'); sel.textContent = '';
+    var names = Object.keys(Live.clubs).sort();
+    var o0 = el('option', '', 'Choose your club...'); o0.value = ''; sel.appendChild(o0);
+    names.forEach(function (n) { var o = el('option', '', n + ' (' + Live.clubs[n] + ' swimmers)'); o.value = n; if (n === club) o.selected = true; sel.appendChild(o); });
+    built = true;
+  }
+  $('club').addEventListener('change', function (e) { club = e.target.value; put('team.club', club); render(); });
+  $('q').addEventListener('input', render);
+  $('hideDone').addEventListener('click', function () { hideDone = !hideDone; put('team.hideDone', hideDone ? '1' : '0'); render(); });
+
+  function render() {
+    Live.renderHeader($('title'), $('status'), $('banner'));
+    if (!Live.meet) return;
+    if (!built) buildClubs();
+    $('hideDone').className = hideDone ? 'on' : ''; $('hideDone').textContent = hideDone ? 'Finished: hidden' : 'Finished: shown';
+    var list = $('list'); list.textContent = '';
+    if (!club) { list.appendChild(el('div', 'hint', 'Choose your club to see all your swimmers in the order they need to report.')); return; }
+    var q = $('q').value.trim().toLowerCase(), now = Live.now(), rows = [];
+    Object.values(Live.swimmers).forEach(function (s) {
+      if (s.club !== club) return; if (q && s.name.toLowerCase().indexOf(q) < 0) return;
+      s.races.forEach(function (r) { rows.push({ s: s, r: r }); });
+    });
+    rows.sort(function (a, b) { return a.r.heatIndex - b.r.heatIndex || a.r.lane - b.r.lane; });
+    var ticks = Live.ticks('team'), t = el('table'), sent = 0, shownRows = 0; var head = el('tr'); ['Sent', 'Predicted report by', 'Swimmer and race', 'Predicted dive in'].forEach(function (h) { head.appendChild(el('th', '', h)); }); t.appendChild(head);
+    var shown = 0;
+    rows.forEach(function (x) {
+      var h = Live.meet.heats[x.r.heatIndex], e = Live.eta(x.r.heatIndex), status = e ? e.status : null;
+      if (hideDone && status === 'done' && !Live.recentlyDone(x.r.heatIndex)) return;
+      shown++;
+      var isSent = ticks.has(x.r.heatIndex, x.r.lane); shownRows++; if (isSent) sent++;
+      var tr = el('tr', (status === 'done' ? 'rowdone' : (e && status !== 'racing' && e.reportMs <= now ? 'rownow' : '')) + (isSent ? ' ticked' : ''));
+      var c0 = el('td'); var cb = el('input', 'tick'); cb.type = 'checkbox'; cb.checked = isSent; cb.title = 'Tick when you have sent this swimmer to marshalling';
+      cb.addEventListener('change', (function (hi, ln, box) { return function () { ticks.set(hi, ln, box.checked); render(); }; })(x.r.heatIndex, x.r.lane, cb)); c0.appendChild(cb);
+      var c1 = el('td', 't'); c1.appendChild(document.createTextNode(e && e.reportMs && status !== 'done' ? ScheduleCore.clock(e.reportMs) : '-'));
+      if (e && e.reportMs && status !== 'done' && status !== 'racing') c1.appendChild(el('div', 'sub', ScheduleCore.relative(e.reportMs, now)));
+      var c2 = el('td'); c2.appendChild(el('div', '', x.s.name));
+      var line = h.title; c2.appendChild(el('div', 'sub', 'Event ' + h.event + ' · Heat ' + h.heat + ' of ' + h.heatsInEvent + ' · Lane ' + x.r.lane));
+      c2.appendChild(el('div', 'sub', line));
+      c2.appendChild(el('div', 'sub', 'Seed time ' + (x.r.entry || 'not listed')));
+      var rs = Live.result(x.r.heatIndex, x.r.lane);
+      if (rs) { tr.className += ' hasres'; var rl = el('div', 'sub'); rl.appendChild(document.createTextNode('Scoreboard time ')); rl.appendChild(el('b', 'rtime', rs.time)); if (rs.place) rl.appendChild(document.createTextNode(' \u00b7 place ' + rs.place)); rl.appendChild(el('span', 'unofficial', ' unofficial')); c2.appendChild(rl); }
+      if (status === 'racing') c2.appendChild(el('span', 'badge racing', 'RACING')); else if (status === 'done') c2.appendChild(el('span', 'badge', 'DONE'));
+      else if (e && e.reportMs <= now) c2.appendChild(el('span', 'badge report', 'REPORT NOW'));
+      var c3 = el('td', 't', e && e.startMs && status !== 'done' ? ScheduleCore.clock(e.startMs) : '-');
+      tr.appendChild(c0); tr.appendChild(c1); tr.appendChild(c2); tr.appendChild(c3); t.appendChild(tr);
+    });
+    var tb = $('tickbar'); tb.textContent = '';
+    if (!shown) list.appendChild(el('div', 'hint', rows.length ? 'Everyone from this club has finished.' : 'No swimmers found.'));
+    else {
+      list.appendChild(t);
+      var sum = el('span'); sum.appendChild(document.createTextNode('Sent ')); sum.appendChild(el('b', '', sent + ' of ' + shownRows)); sum.appendChild(document.createTextNode(' - ticks stay on this phone only.')); tb.appendChild(sum);
+
+    }
+  }
+  Live.onChange(render); Live.start({ role: 'team' });
+</script>
+</body></html>

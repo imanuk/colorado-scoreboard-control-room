@@ -1,0 +1,45 @@
+#!/bin/bash
+# Desktop launcher for stream day: gets the GoPro ready, opens OBS Studio and
+# the streaming setup checklist. Does not touch the scoreboard server - start
+# that separately with 'Start Scoreboard.command' (the checklist reminds you to).
+
+PROJECT_DIR="__PROJECT_DIR__"
+NODE_BIN="__NODE_PATH__"
+[ -x "$NODE_BIN" ] || NODE_BIN="$(command -v node)"
+
+echo "Streaming Setup"
+echo "----------------------------"
+
+# GoPro: start its Webcam app, wait for the camera, and point OBS at it (macOS
+# gives the camera a new id every time it's connected, which OBS can't follow).
+"$NODE_BIN" "$PROJECT_DIR/scripts/prepare-camera.js"
+CAMERA_RC=$?
+echo ""
+
+if [ "$CAMERA_RC" -eq 3 ]; then
+    echo "Nothing else opened. Quit OBS (Cmd+Q) and double-click this icon again."
+    read -n 1 -s -r -p "Press any key to close..."
+    exit 0
+fi
+if [ "$CAMERA_RC" -ne 0 ]; then
+    echo "Carrying on without the camera - fix the above and run this again if you need it."
+    echo ""
+fi
+
+if pgrep -x OBS >/dev/null 2>&1; then
+    echo "OBS Studio is already open."
+else
+    echo "Opening OBS Studio..."
+    open -a "OBS" 2>/dev/null || echo "WARNING: could not open OBS - is it installed at /Applications/OBS.app?"
+fi
+
+GUIDE="$PROJECT_DIR/public/streaming-guide.html"
+if [ -f "$GUIDE" ]; then
+    open "$GUIDE"
+else
+    echo "WARNING: checklist not found at $GUIDE"
+fi
+
+echo ""
+echo "Done - follow the checklist that just opened in your browser."
+sleep 2

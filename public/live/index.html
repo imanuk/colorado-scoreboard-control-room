@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en-GB">
+<head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Live heat sheet</title><link rel="stylesheet" href="live.css">
+<style>.role { display:block; text-decoration:none; color:var(--text); padding:18px; margin-bottom:12px; } .role b { font-size:20px; display:block; margin-bottom:4px; } .role span { color:var(--dim); font-size:15px; }</style></head>
+<body><div class="wrap">
+<header><h1 id="title">Live heat sheet</h1><div class="status" id="status"></div><div class="banner" id="banner"></div></header>
+<a class="card role" href="athlete.html"><b>Swimmer, parent or team manager</b><span>Follow your own swimmers (or switch to the whole club): what's coming up, when to report to marshalling, and when they're predicted to dive in.</span></a>
+<a class="card role" href="marshal.html"><b>Marshal</b><span>The heat lined up in each marshalling position, updating as races go.</span></a>
+<div class="hint">All times are predictions, based on the entry times in each heat. They correct themselves as each race starts.</div>
+</div>
+<script src="/socket.io/socket.io.js"></script><script src="/autoreload.js"></script><script src="live-config.js"></script><script src="schedule-core.js"></script><script src="live-client.js"></script>
+<script>Live.onChange(function(){ Live.renderHeader(document.getElementById('title'), document.getElementById('status'), document.getElementById('banner')); }); Live.start({ role: 'meet' });</script>
+</body></html>

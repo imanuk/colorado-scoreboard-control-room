@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live view</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
+  #v { position: fixed; inset: 0; width: 100vw; height: 100vh; object-fit: contain; background: #000; }
+  #msg { position: fixed; inset: 0; display: none; place-items: center; text-align: center; color: #9aa7b2; font-size: 18px; padding: 24px; pointer-events: none; }
+  #bar { position: fixed; top: 0; left: 0; right: 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 12px; background: linear-gradient(#000c, #0000); color: #e8eef2; font-size: 13px; transition: opacity .4s; z-index: 5; }
+  #bar.hide { opacity: 0; pointer-events: none; }
+  #bar a, #bar button { font: inherit; font-weight: 600; color: #e8eef2; text-decoration: none; padding: 6px 12px; border-radius: 999px; background: #1c2127cc; border: 1px solid #3a424a; cursor: pointer; }
+  #bar a:hover, #bar button:hover { border-color: #3b82f6; }
+  #bar button.on { background: #1f4fa8; border-color: #3b82f6; }
+  #bar .sp { flex: 1; }
+  #bar .note { color: #9aa7b2; }
+</style>
+</head>
+<body>
+<img id="v" alt="Live view">
+<div id="msg"></div>
+<div id="stall" style="position:fixed;left:0;right:0;bottom:24px;display:none;text-align:center;pointer-events:none"><span style="background:#7a1f1acc;color:#fff;padding:8px 16px;border-radius:999px;font:600 14px -apple-system,Helvetica,Arial,sans-serif"></span></div>
+<div id="bar">
+  <a href="/control.html">&larr; Control room</a>
+  <button data-q="light" title="720p, 10 frames a second - lightest on the network">Light</button>
+  <button data-q="balanced" title="1080p, 15 frames a second">Balanced</button>
+  <button data-q="smooth" title="1080p, 25 frames a second - the full rate of the stream">Smooth</button>
+  <span class="note" id="note"></span>
+  <span class="sp"></span>
+  <button id="reload">Reload</button>
+  <button id="fs">Full screen (F)</button>
+</div>
+
+<script>
+  // What OBS is sending, a fraction of a second behind - NOT the YouTube feed, and no sound.
+  const PRESETS = { light: 'size=720&fps=10', balanced: 'size=1080&fps=15', smooth: 'size=1080&fps=25' };
+  const v = document.getElementById('v'), msg = document.getElementById('msg'), bar = document.getElementById('bar'), note = document.getElementById('note');
+  let quality = new URLSearchParams(location.search).get('q');
+  try { if (!PRESETS[quality]) quality = localStorage.getItem('watchQuality'); } catch (e) {}
+  if (!PRESETS[quality]) quality = 'smooth';   // 1080p at 25 frames a second, the same as the stream
+  let retry = null, wanted = true;
+
+  function show(text) { msg.textContent = text || ''; msg.style.display = text ? 'grid' : 'none'; }
+  function start() {
+    clearTimeout(retry);
+    if (!wanted) return;
+    show('Connecting to the live view...');
+    v.src = `/live.mjpg?${PRESETS[quality]}&_=${Date.now()}`;   // a new address each time so the browser opens a fresh stream
+  }
+  v.addEventListener('load', () => show(''));
+  v.addEventListener('error', async () => {
+    let text = 'Waiting for OBS - the live view will start as soon as it is available...';
+    try {
+      const st = await (await fetch('/api/liveview', { cache: 'no-store' })).json();
+      if (st.paused) text = 'The live view is paused to protect the stream to YouTube. It will come back by itself.';
+      else if (st.viewers >= st.max) text = `The live view is full (${st.max} people are already watching). It will start as soon as one of them leaves.`;
+    } catch (e) { /* keep the default */ }
+    show(text); clearTimeout(retry); retry = setTimeout(start, 2500);
+  });
+
+  function setQuality(q) {
+    quality = q;
+    try { localStorage.setItem('watchQuality', q); } catch (e) {}
+    document.querySelectorAll('#bar button[data-q]').forEach((b) => b.classList.toggle('on', b.dataset.q === q));
+    note.textContent = `${PRESETS[q].replace('size=', '').replace('&fps=', 'p, ')} frames/s - video only, no sound`;
+    start();
+  }
+  document.querySelectorAll('#bar button[data-q]').forEach((b) => b.addEventListener('click', () => setQuality(b.dataset.q)));
+  document.getElementById('reload').addEventListener('click', start);
+
+  function fullscreen() {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen().catch(() => {});
+  }
+  document.getElementById('fs').addEventListener('click', fullscreen);
+  v.addEventListener('dblclick', fullscreen);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'f' || e.key === 'F') fullscreen();
+    else if (e.key === '1') setQuality('light');
+    else if (e.key === '2') setQuality('balanced');
+    else if (e.key === '3') setQuality('smooth');
+  });
+
+  // controls fade out after a few seconds of no movement
+  let hideTimer;
+  function wake() { bar.classList.remove('hide'); clearTimeout(hideTimer); hideTimer = setTimeout(() => bar.classList.add('hide'), 3500); }
+  ['mousemove', 'touchstart', 'keydown', 'click'].forEach((ev) => document.addEventListener(ev, wake));
+  wake();
+
+  // don't pull video in a hidden tab
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { wanted = false; v.removeAttribute('src'); clearTimeout(retry); }
+    else { wanted = true; start(); }
+  });
+
+  // the picture itself can't tell us it has frozen, so ask the server now and then
+  const stall = document.getElementById('stall');
+  setInterval(async () => {
+    if (!wanted) return;
+    try {
+      const st = await (await fetch('/api/liveview', { cache: 'no-store' })).json();
+      let text = '';
+      if (!st.obs) text = 'OBS is not connected - the picture will resume when it is';
+      else if (st.paused) text = 'Paused to protect the stream to YouTube - it will return by itself';
+      else if (st.level > 0) text = 'Reduced quality for now, to protect the stream to YouTube';
+      else if (st.viewers > 0 && st.lastFrameAgoMs !== null && st.lastFrameAgoMs > 3000) text = 'No new picture from OBS for a few seconds';
+      stall.firstChild.textContent = text; stall.style.display = text ? 'block' : 'none';
+    } catch (e) { stall.firstChild.textContent = 'Lost contact with the scoreboard computer'; stall.style.display = 'block'; }
+  }, 2000);
+
+  setQuality(quality);
+</script>
+</body>
+</html>

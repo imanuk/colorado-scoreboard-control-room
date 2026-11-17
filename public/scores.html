@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="/scoreboard.css">
+</head>
+<body>
+    <div class="container">
+        <div class="lane-row" id="row-1"><div class="lane-num"></div><div class="lane-name"></div><div class="pb-badge" hidden></div><div class="lane-time"></div><div class="qual-badge" hidden></div><div class="position-number"></div></div>
+        <div class="lane-row" id="row-2"><div class="lane-num"></div><div class="lane-name"></div><div class="pb-badge" hidden></div><div class="lane-time"></div><div class="qual-badge" hidden></div><div class="position-number"></div></div>
+        <div class="lane-row" id="row-3"><div class="lane-num"></div><div class="lane-name"></div><div class="pb-badge" hidden></div><div class="lane-time"></div><div class="qual-badge" hidden></div><div class="position-number"></div></div>
+        <div class="lane-row" id="row-4"><div class="lane-num"></div><div class="lane-name"></div><div class="pb-badge" hidden></div><div class="lane-time"></div><div class="qual-badge" hidden></div><div class="position-number"></div></div>
+        <div class="lane-row" id="row-5"><div class="lane-num"></div><div class="lane-name"></div><div class="pb-badge" hidden></div><div class="lane-time"></div><div class="qual-badge" hidden></div><div class="position-number"></div></div>
+        <div class="lane-row" id="row-6"><div class="lane-num"></div><div class="lane-name"></div><div class="pb-badge" hidden></div><div class="lane-time"></div><div class="qual-badge" hidden></div><div class="position-number"></div></div>
+        <div class="lane-row" id="row-7"><div class="lane-num"></div><div class="lane-name"></div><div class="pb-badge" hidden></div><div class="lane-time"></div><div class="qual-badge" hidden></div><div class="position-number"></div></div>
+        <div class="lane-row" id="row-8"><div class="lane-num"></div><div class="lane-name"></div><div class="pb-badge" hidden></div><div class="lane-time"></div><div class="qual-badge" hidden></div><div class="position-number"></div></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/autoreload.js"></script>
+    <script>
+        const socket = io();
+        watchVersion(socket);
+        
+        socket.on('scoreboard', function(data) {
+            const lanes = [];
+            for (let lane = 8; lane >= 1; lane--) {
+                lanes.push({
+                    lane: lane,
+                    name: data[`lane_name${lane}`] || '',
+                    time: data[`lane_time${lane}`] || '',
+                    place: data[`lane_place${lane}`] || '',
+                    pb: data[`lane_pb${lane}`] || '',
+                    qual: data[`lane_qual${lane}`] || ''
+                });
+            }
+            
+            lanes.forEach((entry, index) => {
+                const row = document.getElementById(`row-${index + 1}`);
+                row.querySelector('.lane-num').textContent = entry.lane;
+                row.querySelector('.lane-name').textContent = entry.name;
+                row.querySelector('.lane-time').textContent = entry.time;
+                const placeEl = row.querySelector('.position-number');
+                placeEl.textContent = entry.place && entry.place.trim() ? entry.place : '';
+                const pbEl = row.querySelector('.pb-badge');
+                pbEl.textContent = entry.pb;
+                pbEl.hidden = !entry.pb;
+                const qualEl = row.querySelector('.qual-badge');
+                qualEl.textContent = entry.qual;
+                qualEl.dataset.level = entry.qual;
+                qualEl.hidden = !entry.qual;
+            });
+        });
+    </script>
+</body>
+</html>

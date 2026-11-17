@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="/scoreboard.css">
+    <style>
+        /* Optional stream overlay: the same "Next: Event X Heat Y - title"
+           prompt the TV shows, as its own browser source. Fully transparent
+           (nothing drawn at all) whenever there's no next-race text. */
+        body { background: transparent; padding: 0; }
+        .container { width: auto; display: inline-block; }
+        .next-race-line { display: inline-flex; }
+        .next-race-line.empty { visibility: hidden; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="next-race-line empty" id="next-race"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/autoreload.js"></script>
+    <script>
+        const socket = io();
+        watchVersion(socket);
+        socket.on('scoreboard', function(data) {
+            const el = document.getElementById('next-race');
+            el.textContent = data.next_race ? `Next: ${data.next_race}` : '';
+            el.classList.toggle('empty', !data.next_race);
+        });
+    </script>
+</body>
+</html>

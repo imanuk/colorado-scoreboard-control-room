@@ -1,0 +1,162 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Choose meet</title>
+<style>
+  body { margin: 0; padding: 32px 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: #14181c; color: #e8eef2; }
+  .card { max-width: 560px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+  .sub { color: #8a97a3; font-size: 13px; margin-bottom: 20px; }
+  .meet { display: block; width: 100%; text-align: left; padding: 12px 14px; margin-bottom: 8px; border-radius: 8px; background: #1c2127; border: 1px solid #262c33; color: #e8eef2; font: inherit; cursor: pointer; }
+  .meet:hover:not(:disabled) { border-color: #3b82f6; }
+  .meet.selected { border-color: #34c759; background: #1b2a21; }
+  .meet:disabled { opacity: .5; cursor: default; }
+  .meet .name { font-size: 15px; font-weight: 600; }
+  .meet .detail { color: #8a97a3; font-size: 12px; margin-top: 3px; }
+  .badge { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #34c759; color: #06240f; margin-left: 8px; vertical-align: 1px; }
+  .badge.newest { background: #3b82f6; color: #fff; }
+  #msg { font-size: 13px; margin: 14px 0; min-height: 18px; color: #8a97a3; }
+  #msg.err { color: #ff6b61; }
+  #msg.ok { color: #34c759; }
+  .row { display: flex; gap: 8px; margin-top: 16px; }
+  button.plain { padding: 8px 12px; border-radius: 8px; background: #1c2127; border: 1px solid #262c33; color: #e8eef2; font: inherit; font-size: 13px; cursor: pointer; }
+  a { color: #7fb0ff; font-size: 13px; }
+  h2 { font-size: 15px; font-weight: 600; margin: 28px 0 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid #262c33; vertical-align: top; }
+  th { color: #8a97a3; font-weight: 500; }
+  td.n { text-align: right; }
+  .warn { color: #ffb340; }
+  .good { color: #34c759; }
+  ul.problems { margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: #ffb340; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Choose meet</h1>
+  <div class="sub">Loads that meet's scoreboard file (<code>reports/*_SCB.TXT</code>) from the shared Google Drive "Meets" folder, for event titles, names and PB badges. Newest reports first.</div>
+  <div id="meets">Loading meets from Google Drive...</div>
+  <div id="msg"></div>
+  <div class="row">
+    <button class="plain" id="sync">Sync now</button>
+    <button class="plain" id="refresh">Refresh list</button>
+  </div>
+  <h2>Data check</h2>
+  <div class="sub" id="checksub">What the loaded files contain, and anything missing or inconsistent.</div>
+  <div id="check">Loading...</div>
+  <p><a href="/control.html">&larr; Back to the control room</a></p>
+</div>
+<script>
+  const meetsEl = document.getElementById('meets');
+  const msgEl = document.getElementById('msg');
+  function say(text, cls) { msgEl.textContent = text; msgEl.className = cls || ''; }
+  function ago(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  }
+  function render(data) {
+    const sel = data.status.selected && data.status.selected.id;
+    meetsEl.textContent = '';
+    let newest = true;
+    data.meets.forEach((m) => {
+      const ready = m.files.length > 0 || (m.dlink || []).length > 0;
+      const b = document.createElement('button');
+      b.className = 'meet' + (m.id === sel ? ' selected' : '');
+      b.disabled = !ready;
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = m.name;
+      if (m.id === sel) { const t = document.createElement('span'); t.className = 'badge'; t.textContent = 'loaded'; name.appendChild(t); }
+      else if (ready && newest) { const t = document.createElement('span'); t.className = 'badge newest'; t.textContent = 'newest'; name.appendChild(t); }
+      if (ready) newest = false;
+      const detail = document.createElement('div');
+      detail.className = 'detail';
+      detail.textContent = ready
+        ? `${[m.files.length ? m.files.map((f) => f.name).join(', ') : '', (m.dlink || []).length ? `${m.dlink.length} DLinkHSL .scb file(s)` : ''].filter(Boolean).join(' + ')} - updated ${ago(m.lastUpdated)}`
+        : (m.error ? `Could not read: ${m.error}` : (m.hasReports ? 'No scoreboard file (*_SCB.TXT) in reports yet' : 'No reports or DLinkHSL files yet'));
+      b.append(name, detail);
+      b.addEventListener('click', () => choose(m));
+      meetsEl.appendChild(b);
+    });
+    if (!data.meets.length) meetsEl.textContent = 'No meet folders found.';
+    const st = data.status;
+    if (st.lastError) say(`Last sync problem: ${st.lastError} (existing files are still in use)`, 'err');
+    else if (st.lastSyncAt && st.selected) say(`${st.selected.name}: ${st.files.length} file(s) loaded, checked ${new Date(st.lastSyncAt).toLocaleTimeString()}`, 'ok');
+  }
+  async function load(refresh) {
+    try {
+      const r = await fetch('/api/meets' + (refresh ? '?refresh=1' : ''));
+      const data = await r.json();
+      if (!r.ok) { meetsEl.textContent = ''; say(`Could not reach Google Drive: ${data.error}. The last loaded meet's files are still in use.`, 'err'); return; }
+      render(data);
+    } catch (e) { say('Could not reach the scoreboard server.', 'err'); }
+  }
+  async function choose(m) {
+    say(`Loading ${m.name}...`);
+    const r = await fetch('/api/meets/select', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: m.id }) });
+    const data = await r.json();
+    if (!r.ok) { say(data.error, 'err'); return; }
+    await load(false);
+  }
+  document.getElementById('sync').addEventListener('click', async () => { say('Syncing...'); await fetch('/api/meets/sync', { method: 'POST' }); await load(true); });
+  document.getElementById('refresh').addEventListener('click', () => { say('Refreshing...'); load(true); });
+  async function loadCheck() {
+    const el = document.getElementById('check');
+    try {
+      const d = await (await fetch('/api/meets/check')).json();
+      const t = d.totals;
+      if (!t.events) { el.textContent = 'No meet data loaded yet.'; return; }
+      el.textContent = '';
+      const sum = document.createElement('div');
+      sum.className = 'sub';
+      sum.textContent = `${t.events} events, ${t.swimmers} swimmers: ${t.withEntryTime} with an entry time (PB badges possible), ${t.noEntryTime} without (their first time shows a plain PB)` + (t.namesOnly ? `, ${t.namesOnly} known by name only` : '') + '.';
+      const table = document.createElement('table');
+      table.innerHTML = '<tr><th>Event</th><th>Title</th><th class="n">Heats</th><th class="n">Swimmers</th><th class="n">Timed</th><th>Sources</th></tr>';
+      d.events.forEach((e) => {
+        const tr = document.createElement('tr');
+        [e.number, e.title, e.heats, e.swimmers, e.withEntryTime, `${e.inScbTxt ? 'SCB.TXT' : ''}${e.inScbTxt && e.inDlinkScb ? ' + ' : ''}${e.inDlinkScb ? '.scb' : ''}`].forEach((v, i) => {
+          const td = document.createElement('td');
+          td.textContent = v;
+          if (i === 2 || i === 3 || i === 4) td.className = 'n';
+          tr.appendChild(td);
+        });
+        table.appendChild(tr);
+      });
+      el.append(sum, table);
+      const p = document.createElement('div');
+      if (d.problems.length) {
+        p.innerHTML = `<div class="warn" style="margin-top:10px;font-size:13px">${d.problems.length} thing(s) to look at:</div>`;
+        const ul = document.createElement('ul'); ul.className = 'problems';
+        d.problems.slice(0, 60).forEach((x) => { const li = document.createElement('li'); li.textContent = x; ul.appendChild(li); });
+        p.appendChild(ul);
+      } else { p.innerHTML = '<div class="good" style="margin-top:10px;font-size:13px">Nothing missing - the files agree with each other.</div>'; }
+      el.appendChild(p);
+      const qd = document.createElement('div');
+      const qs = d.qualifying;
+      if (qs) {
+        qd.innerHTML = '<h2>Qualifying times (CT / RT / NT)</h2>';
+        const line = document.createElement('div');
+        line.className = 'sub';
+        line.textContent = qs.standards.length
+          ? `Using (${qs.course}): ` + qs.standards.map((x) => `${x.level} ${x.name} [${x.scope}]`).join('; ')
+          : 'None loaded - CT/RT/NT badges are off. Put the standards files in qualtimes/ and list them in config/qualifying.json (see qualtimes/README.txt).';
+        qd.appendChild(line);
+        if (qs.problems.length) {
+          const ul = document.createElement('ul'); ul.className = 'problems';
+          qs.problems.forEach((x) => { const li = document.createElement('li'); li.textContent = x; ul.appendChild(li); });
+          qd.appendChild(ul);
+        }
+        el.appendChild(qd);
+      }
+    } catch (e) { el.textContent = 'Could not load the data check.'; }
+  }
+  const _load = load;
+  load = async function (r) { await _load(r); loadCheck(); };
+  load(false);
+</script>
+<script src="/backlink.js"></script>
+</body>
+</html>

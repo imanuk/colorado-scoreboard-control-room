@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="/scoreboard.css">
+    <style>
+        body.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="hidden">
+    <div class="touch-container">
+        <div class="touch-lanes" id="lanes-container"></div>
+        <div class="distance-box" id="distance">50m</div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/autoreload.js"></script>
+    <script>
+        const socket = io();
+        watchVersion(socket);
+        let currentLanes = new Set(); // Track which lanes are currently displayed
+        
+        socket.on('scoreboard', function(data) {
+            const touchData = data.touch_data || [];
+            const distance = data.touch_distance || 0;
+            
+            // Update distance display
+            if (distance > 0) {
+                document.getElementById('distance').textContent = `${distance}m`;
+            }
+            
+            // Show if we have touch data
+            if (touchData.length > 0) {
+                updateDisplay(touchData);
+                document.body.classList.remove('hidden');
+                console.log('TOUCH - SHOWING', touchData.length, 'touches at', distance, 'm');
+            } else {
+                // Fade out before clearing
+                const container = document.getElementById('lanes-container');
+                const existingRows = container.querySelectorAll('.lane-row');
+                existingRows.forEach(row => row.classList.remove('visible'));
+                
+                setTimeout(() => {
+                    container.innerHTML = '';
+                    currentLanes.clear();
+                }, 300);
+                
+                document.body.classList.add('hidden');
+                console.log('TOUCH - HIDDEN');
+            }
+        });
+        
+        function updateDisplay(touchData) {
+            const container = document.getElementById('lanes-container');
+            
+            // Get new set of lanes
+            const newLanes = new Set(touchData.map(t => t.lane));
+            
+            // Find lanes to remove
+            const lanesToRemove = Array.from(currentLanes).filter(lane => !newLanes.has(lane));
+            
+            // Remove lanes that are no longer touched
+            lanesToRemove.forEach(lane => {
+                const row = container.querySelector(`[data-lane="${lane}"]`);
+                if (row) {
+                    row.classList.remove('visible');
+                    setTimeout(() => {
+                        if (row.parentNode) row.parentNode.removeChild(row);
+                    }, 300);
+                }
+                currentLanes.delete(lane);
+            });
+            
+            // Update or add lanes
+            touchData.forEach((touch, index) => {
+                let row = container.querySelector(`[data-lane="${touch.lane}"]`);
+                
+                if (row) {
+                    // Update existing row
+                    const cells = row.querySelectorAll('div');
+                    cells[0].textContent = touch.position;
+                    cells[3].textContent = touch.time;
+                } else {
+                    // Add new row
+                    row = document.createElement('div');
+                    row.className = 'lane-row animated';
+                    row.setAttribute('data-lane', touch.lane);
+                    
+                    row.innerHTML = `
+                        <div class="position-number">${touch.position}</div>
+                        <div class="lane-num">${touch.lane}</div>
+                        <div class="lane-name">${touch.name}</div>
+                        <div class="lane-time">${touch.time}</div>
+                    `;
+                    
+                    container.appendChild(row);
+                    currentLanes.add(touch.lane);
+                    
+                    // Animate in
+                    setTimeout(() => {
+                        row.classList.add('visible');
+                    }, 50);
+                }
+            });
+            
+            // Reorder rows to match sorted order
+            touchData.forEach((touch) => {
+                const row = container.querySelector(`[data-lane="${touch.lane}"]`);
+                if (row && row.parentNode === container) {
+                    container.appendChild(row);
+                }
+            });
+        }
+    </script>
+</body>
+</html>

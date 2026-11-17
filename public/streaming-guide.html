@@ -1,0 +1,154 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Stream Setup</title>
+<style>
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: #14181c;
+    color: #e8eef2;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 40px 16px;
+  }
+  .card {
+    width: 480px;
+    max-width: 92vw;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  .sub {
+    color: #8a97a3;
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+  ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 10px;
+    counter-reset: step;
+  }
+  li {
+    counter-increment: step;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #1c2127;
+    border: 1px solid #262c33;
+    cursor: pointer;
+    user-select: none;
+  }
+  li.done {
+    opacity: 0.45;
+  }
+  li.done .step-text {
+    text-decoration: line-through;
+  }
+  .step-num {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #262c33;
+    color: #8a97a3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  li.done .step-num {
+    background: #34c759;
+    color: #0d1117;
+  }
+  .step-text {
+    font-size: 14.5px;
+    line-height: 1.4;
+  }
+  .step-detail {
+    display: block;
+    color: #8a97a3;
+    font-size: 12.5px;
+    margin-top: 2px;
+    text-decoration: none !important;
+  }
+  .note {
+    margin-top: 24px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #1c2127;
+    border: 1px dashed #262c33;
+    color: #8a97a3;
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+  a { color: #3b82f6; }
+  .reset-btn {
+    margin-top: 16px;
+    background: none;
+    border: 1px solid #262c33;
+    color: #8a97a3;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Stream Setup</h1>
+  <div class="sub">Click each step to check it off. Refreshing resets the list for next time.</div>
+
+  <h2 style="font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:#8a97a3; margin:0 0 8px;">Before the meet - load swimmer names</h2>
+  <ol id="steps-prep">
+    <li><span class="step-num"></span><span class="step-text">Set up the Gen7 console for today's meet</span></li>
+    <li><span class="step-num"></span><span class="step-text">In Meet Manager, set up the connection to the Gen7<span class="step-detail">Meet Manager's scoreboard/timing-console connection settings, pointed at the Gen7.</span></span></li>
+    <li><span class="step-num"></span><span class="step-text">Export the scoreboard names file from Meet Manager, copy it to a USB stick<span class="step-detail">Usually via USB stick, per the connection set up above.</span></span></li>
+    <li><span class="step-num"></span><span class="step-text">Load that file into the Gen7 from the USB stick<span class="step-detail"><strong>Exact menu/steps on the Gen7 still need double-checking next time you do this</strong> - update once confirmed.</span></span></li>
+    <li><span class="step-num"></span><span class="step-text">Confirm names are showing on the Gen7 console itself before relying on them over RS-485<span class="step-detail">If they're not on the console, they won't come through the scoreboard app either.</span></span></li>
+    <li><span class="step-num"></span><span class="step-text">Make sure the meet's scoreboard file is in the shared Google Drive meet folder<span class="step-detail"><code>Meets/&lt;meet&gt;/reports/&hellip;_SCB.TXT</code> (and the DLinkHSL files). The start icon lists the meets and loads the newest; <a href="/meet.html" onclick="event.stopPropagation()">Choose meet</a> shows what each contains and flags anything missing.</span></span></li>
+
+  </ol>
+
+  <h2 style="font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:#8a97a3; margin:20px 0 8px;">Going live</h2>
+  <ol id="steps">
+    <li><span class="step-num"></span><span class="step-text">Set up the kit<span class="step-detail">Charger in, USB ethernet adapter in, HDMI to the TV (TV on), GoPro plugged in by USB-C and switched on (USB Connection = GoPro Connect).</span></span></li>
+    <li><span class="step-num"></span><span class="step-text">Double-click <strong>Start Stream Day</strong> on the Desktop<span class="step-detail">It starts the scoreboard, asks which meet (Enter takes the newest), gets the GoPro ready, opens OBS and opens the <a href="/control.html" onclick="event.stopPropagation()">control room</a>. If it says OBS needs a restart once, say yes (only when you are not live).</span></span></li>
+    <li><span class="step-num"></span><span class="step-text">Wait for the green ticks in the control room<span class="step-detail">Fix anything red - each one says what to do. Amber is worth a look but won't stop you. "Re-run checks" repeats them.</span></span></li>
+    <li><span class="step-num"></span><span class="step-text">Check the preview and the TV<span class="step-detail">The "On air" picture should be live and framed properly, and the Samsung showing the scoreboard (Scoreboard TV scene projected to it).</span></span></li>
+    <li><span class="step-num"></span><span class="step-text">Paste the YouTube live link into "What viewers see" (first time only)<span class="step-detail">It is remembered. It shows what viewers actually receive, 15-30 seconds behind, muted.</span></span></li>
+    <li><span class="step-num"></span><span class="step-text">Press <strong>Go live</strong> and confirm<span class="step-detail">Starts the stream (to <a href="https://restream.io" target="_blank" rel="noopener" onclick="event.stopPropagation()">Restream.io</a>, which fans out to YouTube) and the recording together; it waits to see the stream actually hold before saying it worked.</span></span></li>
+    <li><span class="step-num"></span><span class="step-text">Confirm the viewer panel shows the broadcast<span class="step-detail">If it doesn't after a minute, check the Restream dashboard - every destination it fans out to.</span></span></li>
+    <li><span class="step-num"></span><span class="step-text">At the end press <strong>Stop</strong> and confirm<span class="step-detail">It shows where the recording was saved. Heat chapter markers are added to the recording automatically.</span></span></li>
+  </ol>
+  <button class="reset-btn" id="reset">Reset checklist</button>
+  <div class="note">
+    Streaming is via <a href="https://restream.io" target="_blank" rel="noopener">Restream.io</a> (OBS streams to Restream, which handles
+    distribution from there) - not directly to a single platform, so double-check the
+    Restream dashboard if a viewer reports nothing showing.<br><br>
+    This list is a plain reminder - the control room does the checking and the Go live / Stop buttons. Edit <code>public/streaming-guide.html</code> if your steps change.
+  </div>
+</div>
+<script>
+  document.querySelectorAll('#steps-prep li, #steps li').forEach(li => {
+    li.addEventListener('click', () => li.classList.toggle('done'));
+  });
+  document.getElementById('reset').addEventListener('click', () => {
+    document.querySelectorAll('#steps-prep li.done, #steps li.done').forEach(li => li.classList.remove('done'));
+  });
+</script>
+<script src="/backlink.js"></script>
+</body>
+</html>

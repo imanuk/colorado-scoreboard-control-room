@@ -1,0 +1,20 @@
+# Live heat sheet - kept out of search engines and never cached by the phones' browsers.
+# (If the site ever shows a "500 error" after upload, rename this file to htaccess.off - everything
+# still works without it, it only adds the extra no-cache / no-index headers.)
+DirectoryIndex index.html
+
+<IfModule mod_headers.c>
+    Header set X-Robots-Tag "noindex, nofollow"
+    Header set Cache-Control "no-store, max-age=0"
+    # scripts and styles carry a version in their address, so they can be kept for a while
+    <FilesMatch "\.(css|js)$">
+        Header set Cache-Control "public, max-age=3600"
+    </FilesMatch>
+</IfModule>
+
+# The key-hash file is not for browsers.
+<IfModule mod_authz_core.c>
+    <FilesMatch "^update-config\.php$">
+        Require all denied
+    </FilesMatch>
+</IfModule>

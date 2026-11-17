@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="/scoreboard.css">
+    <style>
+        .distance-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(128, 0, 128, 0.9);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 48px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            z-index: 100;
+        }
+        
+        .distance-indicator.visible {
+            opacity: 1;
+        }
+        
+        .container {
+            margin-top: 100px;
+        }
+        
+        .lane-place.hidden,
+        .lane-time.hidden {
+            opacity: 0;
+        }
+        
+        .lane-place,
+        .lane-time {
+            transition: opacity 0.3s ease-in-out;
+        }
+        
+        .lane-place {
+            min-width: 60px;
+            text-align: center;
+            color: white;
+            font-weight: bold;
+            padding: 0 5px;
+            flex-shrink: 0;
+        }
+        
+        .lane-place:before {
+            content: '[';
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .lane-place:after {
+            content: ']';
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .lane-place.hidden:before,
+        .lane-place.hidden:after {
+            content: '';
+        }
+        
+        .lane-row {
+            gap: 5px;
+        }
+        
+        .lane-num {
+            flex-shrink: 0;
+        }
+        
+        .lane-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex-grow: 1;
+            min-width: 0;
+        }
+        
+        .lane-time {
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="distance-indicator" id="distance-indicator">50m</div>
+    
+    <div class="container">
+        <div class="lane-row animated" id="row-1">
+            <div class="lane-num"></div>
+            <div class="lane-name"></div>
+            <div class="lane-time"></div>
+            <div class="lane-place"></div>
+        </div>
+        
+        <div class="lane-row animated" id="row-2">
+            <div class="lane-num"></div>
+            <div class="lane-name"></div>
+            <div class="lane-time"></div>
+            <div class="lane-place"></div>
+        </div>
+        
+        <div class="lane-row animated" id="row-3">
+            <div class="lane-num"></div>
+            <div class="lane-name"></div>
+            <div class="lane-time"></div>
+            <div class="lane-place"></div>
+        </div>
+        
+        <div class="lane-row animated" id="row-4">
+            <div class="lane-num"></div>
+            <div class="lane-name"></div>
+            <div class="lane-time"></div>
+            <div class="lane-place"></div>
+        </div>
+        
+        <div class="lane-row animated" id="row-5">
+            <div class="lane-num"></div>
+            <div class="lane-name"></div>
+            <div class="lane-time"></div>
+            <div class="lane-place"></div>
+        </div>
+        
+        <div class="lane-row animated" id="row-6">
+            <div class="lane-num"></div>
+            <div class="lane-name"></div>
+            <div class="lane-time"></div>
+            <div class="lane-place"></div>
+        </div>
+        
+        <div class="lane-row animated" id="row-7">
+            <div class="lane-num"></div>
+            <div class="lane-name"></div>
+            <div class="lane-time"></div>
+            <div class="lane-place"></div>
+        </div>
+        
+        <div class="lane-row animated" id="row-8">
+            <div class="lane-num"></div>
+            <div class="lane-name"></div>
+            <div class="lane-time"></div>
+            <div class="lane-place"></div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/autoreload.js"></script>
+    <script>
+        const socket = io();
+        watchVersion(socket);
+        let currentDisplayData = [];
+        let lastState = '';
+        let lastEventHeat = '';
+        let previousTimes = {}; // Track previous times to detect counting
+        
+        socket.on('scoreboard', function(data) {
+            const meetTitle = data.event_name || 'Meet';
+            const eventHeat = data.event_heat || 'Event 0 Heat 0';
+            const eventTitle = data.event_title || '';
+            const displayState = data.display_state;
+            const touchData = data.touch_data || [];
+            const hasTouchData = touchData.length > 0;
+            
+            // Check if state or event changed
+            const stateChanged = displayState !== lastState;
+            const eventChanged = eventHeat !== lastEventHeat;
+            const shouldAnimate = eventChanged; // Only animate on event change, not state change
+            
+            // Reset time tracking on event change
+            if (eventChanged) {
+                previousTimes = {};
+            }
+            
+            // Handle display based on touch data presence
+            if (hasTouchData) {
+                handleTouchState(data, shouldAnimate);
+            } else if (displayState === 'start') {
+                handleStartState(data, shouldAnimate);
+            } else if (displayState === 'result') {
+                handleResultState(data, shouldAnimate);
+            }
+            
+            lastState = displayState;
+            lastEventHeat = eventHeat;
+        });
+        
+        function handleStartState(data, shouldAnimate) {
+            // Hide distance indicator
+            document.getElementById('distance-indicator').classList.remove('visible');
+            
+            // Collect lane data sorted by lane number (8 to 1 for start display)
+            const laneData = [];
+            for (let lane = 8; lane >= 1; lane--) {
+                const name = data[`lane_name${lane}`] || '';
+                laneData.push({
+                    place: '',
+                    lane: lane,
+                    name: name,
+                    time: ''
+                });
+            }
+            
+            updateDisplay(laneData, false, false, shouldAnimate); // No places, no times
+        }
+        
+        function handleTouchState(data, shouldAnimate) {
+            const touchData = data.touch_data || [];
+            const distance = data.touch_distance || 0;
+            
+            console.log('TOUCH STATE - touchData:', touchData, 'distance:', distance);
+            
+            // Show distance indicator
+            const distanceEl = document.getElementById('distance-indicator');
+            distanceEl.textContent = `${distance}m`;
+            if (distance > 0) {
+                distanceEl.classList.add('visible');
+            } else {
+                distanceEl.classList.remove('visible');
+            }
+            
+            // Build display data sorted by lane (8 to 1) using actual place from backend
+            const displayData = [];
+            for (let lane = 8; lane >= 1; lane--) {
+                const name = data[`lane_name${lane}`] || '';
+                const time = data[`lane_time${lane}`] || '';
+                const place = data[`lane_place${lane}`] || '';
+                
+                // Check if time is static (not counting) by comparing with previous
+                const timeKey = `lane${lane}`;
+                const isStatic = previousTimes[timeKey] === time && time !== '';
+                
+                // Store current time for next comparison
+                previousTimes[timeKey] = time;
+                
+                console.log(`Lane ${lane}: place="${place}", time="${time}", static=${isStatic}, name="${name}"`);
+                
+                displayData.push({
+                    place: isStatic ? place : '', // Only show place when time is static
+                    lane: lane,
+                    name: name,
+                    time: isStatic ? time : ''   // Only show time when static
+                });
+            }
+            
+            console.log('TOUCH - display data:', displayData);
+            updateDisplay(displayData, true, true, shouldAnimate); // Show places and times
+        }
+        
+        function handleResultState(data, shouldAnimate) {
+            // Show distance indicator with final distance (keep showing even after result)
+            const totalDistance = data.touch_total_distance || 0;
+            const distanceEl = document.getElementById('distance-indicator');
+            if (totalDistance > 0) {
+                distanceEl.textContent = `${totalDistance}m`;
+                distanceEl.classList.add('visible');
+            }
+            
+            // Capture results when transitioning to result state
+            if (lastState !== 'result') {
+                currentDisplayData = [];
+                
+                // Build display data sorted by lane (8 to 1)
+                for (let lane = 8; lane >= 1; lane--) {
+                    const place = data[`lane_place${lane}`];
+                    const name = data[`lane_name${lane}`];
+                    const time = data[`lane_time${lane}`];
+                    
+                    currentDisplayData.push({
+                        place: place && place.trim() ? place : '',
+                        lane: lane,
+                        name: name || '',
+                        time: time || ''
+                    });
+                }
+                
+                console.log('RESULT - Captured results for all lanes');
+            }
+            
+            updateDisplay(currentDisplayData, true, true, shouldAnimate); // Show places and times
+        }
+        
+        function updateDisplay(displayData, showPlaces, showTimes, shouldAnimate) {
+            if (shouldAnimate) {
+                // Clear all rows first for animation (only on event change)
+                for (let i = 1; i <= 8; i++) {
+                    const row = document.getElementById(`row-${i}`);
+                    row.classList.remove('visible');
+                }
+                
+                setTimeout(() => {
+                    updateDisplayContent(displayData, showPlaces, showTimes, true);
+                }, 100);
+            } else {
+                // Just update content without animation - keep rows visible
+                updateDisplayContent(displayData, showPlaces, showTimes, false);
+            }
+        }
+        
+        function updateDisplayContent(displayData, showPlaces, showTimes, animate) {
+            displayData.forEach((item, index) => {
+                if (index < 8) {
+                    const row = document.getElementById(`row-${index + 1}`);
+                    const cells = row.querySelectorAll('div');
+                    
+                    // Lane number
+                    cells[0].textContent = item.lane || '';
+                    
+                    // Name
+                    cells[1].textContent = item.name || '';
+                    
+                    // Time
+                    cells[2].textContent = showTimes ? (item.time || '') : '';
+                    if (showTimes && item.time) {
+                        cells[2].classList.remove('hidden');
+                    } else {
+                        cells[2].classList.add('hidden');
+                    }
+                    
+                    // Place
+                    const placeValue = showPlaces ? (item.place || '') : '';
+                    cells[3].textContent = placeValue;
+                    console.log(`Row ${index + 1}, Lane ${item.lane}: place="${item.place}", showing="${placeValue}", showPlaces=${showPlaces}`);
+                    
+                    if (showPlaces && item.place && item.place.trim()) {
+                        cells[3].classList.remove('hidden');
+                    } else {
+                        cells[3].classList.add('hidden');
+                    }
+                    
+                    // Animate in if needed, otherwise ensure it's visible
+                    if (animate) {
+                        setTimeout(() => {
+                            row.classList.add('visible');
+                        }, index * 100);
+                    } else {
+                        // Always ensure row is visible when not animating
+                        row.classList.add('visible');
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

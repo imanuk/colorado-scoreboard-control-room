@@ -1,0 +1,247 @@
+/* Scoreboard styles */
+body {
+    margin: 0;
+    padding: 20px;
+    background: transparent;
+    font-family: 'Ubuntu', sans-serif;
+    overflow: hidden;
+}
+.container {
+    width: 800px;
+}
+/* Title Box */
+.title-box {
+    background: #FFFFFF;
+    color: #000000;
+    padding: 8px 20px;
+    margin-bottom: 0px;
+    font-size: 32px;
+    font-weight: bold;
+    line-height: 1.1;
+}
+.title-box.purple {
+    background: #6A0DAD;
+    color: #FFD700;
+}
+.subtitle {
+    font-size: 28px;
+    margin-top: 2px;
+}
+/* Lane Rows */
+.lane-row {
+    background: #000000;
+    display: flex;
+    align-items: center;
+    padding: 0px 0;
+    margin-bottom: 0px;
+    /* Trimmed from 52px to make room for .next-race-line below without
+       growing the page's total height - 8 rows x ~6px covers it. */
+    min-height: 46px;
+}
+.lane-row.animated {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+}
+.lane-row.animated.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+/* Lane Number (for start page - purple background) */
+.lane-number {
+    background: #6A0DAD;
+    color: #FFD700;
+    font-size: 36px;
+    font-weight: normal;
+    width: 80px;
+    text-align: center;
+    padding: 8px 0;
+}
+/* Position Number (for result/touch pages - purple background) */
+.position-number {
+    background: #6A0DAD;
+    color: #FFD700;
+    font-size: 36px;
+    font-weight: normal;
+    width: 54px;
+    text-align: center;
+    padding: 0px 0;
+}
+/* Lane Number in results/touch (yellow text, no background) */
+.lane-num {
+    color: #FFD700;
+    font-size: 36px;
+    font-weight: normal;
+    padding: 0 4px 0 10px;
+    min-width: 24px;
+    flex-shrink: 0;
+}
+/* Swimmer Name */
+.lane-name {
+    color: #FFFFFF;
+    font-size: 36px;
+    font-weight: normal;
+    padding: 0 10px 0 6px;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+/* Time */
+.lane-time {
+    color: #FFD700;
+    font-size: 36px;
+    font-weight: normal;
+    font-family: 'Ubuntu', sans-serif;
+    padding: 0 12px 0 20px;
+    min-width: 150px;
+    text-align: right;
+    flex-shrink: 0;
+}
+/* PB Badge - sits between name and time; name truncates behind it via the
+   ordinary flex/ellipsis on .lane-name if it doesn't fit. Hidden entirely
+   (zero width) when not a PB, via the [hidden] attribute. */
+.pb-badge {
+    background: #6A0DAD;
+    color: #FFFFFF;
+    font-size: 30px;
+    font-weight: normal;
+    padding: 4px 9px;
+    text-align: center;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+.pb-badge[hidden] {
+    display: none;
+}
+/* Qualification badge (CT / RT / NT - highest achieved): the same gold-yellow
+   as the times, black text so it stands out. Between the time and the place. */
+.qual-badge {
+    background: #FFD700;
+    color: #000000;
+    font-size: 26px;
+    font-weight: bold;
+    padding: 6px 9px;
+    text-align: center;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+.qual-badge[hidden] { display: none; }
+/* A row with a PB badge: the time box shrinks to its text and loses its left
+   padding, so the badge sits flush against the time (the colour change is
+   the separation). The time stays right-aligned, so times still line up. */
+.pb-badge:not([hidden]) ~ .lane-time {
+    min-width: 0;
+    padding-left: 0;
+}
+/* The qualification badge sits between the time and the place box, so the
+   time loses some of its right padding when one is showing. */
+.lane-time:has(+ .qual-badge:not([hidden])) {
+    padding-right: 6px;
+}
+
+/* Next-race get-ready prompt - full width and flush against the last lane
+   row so it reads as part of the same solid black display, not a separate
+   floating box. Fixed height (not padding-derived) so the bar never
+   resizes when its text appears/clears - only the text itself changes.
+   Text runs off the edge rather than truncating if it doesn't fit. */
+.next-race-line {
+    background: #000000;
+    color: #FFFFFF;
+    font-size: 24px;
+    font-weight: normal;
+    height: 40px;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    overflow: visible;
+}
+/* Place */
+.lane-place {
+    color: #FFD700;
+    font-size: 36px;
+    font-weight: normal;
+    font-family: 'Ubuntu', sans-serif;
+    padding: 0 20px;
+    min-width: 60px;
+    text-align: center;
+    flex-shrink: 0;
+}
+/* Distance Box (for touch page) */
+.distance-box {
+    background: #FFFFFF;
+    color: #000000;
+    padding: 8px 20px;
+    margin-bottom: 5px;
+    font-size: 40px;
+    font-weight: bold;
+    display: inline-block;
+    width: auto;
+}
+/* Timer Page Styles */
+.timer-box {
+    background: #000000;
+    display: flex;
+    padding: 12px 20px;
+}
+.time-section {
+    flex: 1;
+    padding-right: 30px;
+    border-right: 3px solid #FFD700;
+}
+.race-time {
+    color: #FFD700;
+    font-size: 80px;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 3px;
+}
+.event-section {
+    flex: 1;
+    padding-left: 30px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.event-heat {
+    color: #FFD700;
+    font-size: 36px;
+    font-weight: bold;
+    margin-bottom: 6px;
+}
+.event-title {
+    color: #FFFFFF;
+    font-size: 30px;
+}
+/* Master Controller Styles */
+.page {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+.page.active {
+    display: block;
+}
+iframe {
+    border: none;
+    width: 100%;
+    height: 100vh;
+    background: transparent;
+}
+/* Touch page specific - position from bottom */
+.touch-container {
+    width: 800px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 800px;
+}
+.touch-lanes {
+    display: flex;
+    flex-direction: column-reverse;
+}

@@ -1,0 +1,303 @@
+{
+  "course": "SC",
+  "standards": [
+    {
+      "level": "CT",
+      "name": "Lancashire County Championships 2027",
+      "file": "LC27-SC.txt",
+      "course": "SC",
+      "rule": "faster-than",
+      "county": "Lancashire",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-02-09",
+        "to": "2027-01-13"
+      }
+    },
+    {
+      "level": "RT",
+      "name": "Swim England North West Winter Regionals 2026",
+      "file": "SW26-SC.txt",
+      "course": "SC",
+      "rule": "faster-than",
+      "ageAsAt": "2026-12-31",
+      "window": {
+        "from": "2025-04-01",
+        "to": "2026-10-31"
+      },
+      "region": "North West"
+    },
+    {
+      "level": "CT",
+      "name": "Cumbria County Championships 2027",
+      "file": "CC27-SC.txt",
+      "course": "SC",
+      "rule": "faster-than",
+      "county": "Cumbria",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-02-09",
+        "to": "2027-01-05"
+      }
+    },
+    {
+      "level": "CT",
+      "name": "Cheshire County Championships 2027",
+      "file": "CH27-SC.txt",
+      "course": "SC",
+      "rule": "faster-than",
+      "county": "Cheshire",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-01-01",
+        "to": "2026-12-09"
+      }
+    },
+    {
+      "level": "CT",
+      "name": "Bedfordshire County 2027",
+      "file": "Bedfordshire-2027-SC.txt",
+      "county": "Bedfordshire",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-01-01",
+        "to": "2027-01-10"
+      }
+    },
+    {
+      "level": "CT",
+      "name": "Berkshire & South Buckinghamshire County 2027",
+      "file": "BerkshireSouthBuckinghamshire-2027-SC.txt",
+      "county": "Berkshire & South Buckinghamshire",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2025-12-20",
+        "to": "2026-12-22"
+      }
+    },
+    {
+      "level": "CT",
+      "name": "Cornwall County 2027",
+      "file": "Cornwall-2027-SC.txt",
+      "county": "Cornwall",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-03-01",
+        "to": "2027-01-16"
+      }
+    },
+    {
+      "level": "CT",
+      "name": "Devon County 2027",
+      "file": "Devon-2027-SC.txt",
+      "county": "Devon",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-03-01",
+        "to": "2026-12-16"
+      },
+      "disabled": true,
+      "disabledReason": "titled \"Consideration Times\" - not clear these are guaranteed qualifying times"
+    },
+    {
+      "level": "CT",
+      "name": "Dorset County 2027",
+      "file": "Dorset-2027-SC.txt",
+      "county": "Dorset",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-02-22",
+        "to": "2026-12-16"
+      }
+    },
+    {
+      "level": "CT",
+      "name": "Gloucestershire County 2027",
+      "file": "Gloucestershire-2027-SC.txt",
+      "county": "Gloucestershire",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-01-01",
+        "to": "2026-12-13"
+      }
+    },
+    {
+      "level": "CT",
+      "name": "Hampshire County 2027",
+      "file": "Hampshire-2027-SC.txt",
+      "county": "Hampshire",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-03-01",
+        "to": "2027-01-10"
+      }
+    },
+    {
+      "level": "CT",
+      "name": "Hertfordshire County 2027",
+      "file": "Hertfordshire-2027-SC.txt",
+      "county": "Hertfordshire",
+      "course": "SC",
+      "window": {
+        "from": "2026-05-16",
+        "to": null
+      },
+      "disabled": true,
+      "disabledReason": "the page does not say what date ages are taken as at"
+    },
+    {
+      "level": "CT",
+      "name": "Leicestershire County 2027",
+      "file": "Leicestershire-2027-SC.txt",
+      "county": "Leicestershire",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-01-01",
+        "to": "2026-12-16"
+      }
+    },
+    {
+      "level": "CT",
+      "name": "Lincolnshire County 2027",
+      "file": "Lincolnshire-2027-SC.txt",
+      "county": "Lincolnshire",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-01-01",
+        "to": "2026-12-10"
+      }
+    },
+    {
+      "level": "CT",
+      "name": "Middlesex County 2027",
+      "file": "Middlesex-2027-SC.txt",
+      "county": "Middlesex",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-01-01",
+        "to": "2027-01-01"
+      }
+    },
+    {
+      "level": "CT",
+      "name": "Norfolk County 2027",
+      "file": "Norfolk-2027-SC.txt",
+      "county": "Norfolk",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-02-14",
+        "to": "2026-12-24"
+      }
+    },
+    {
+      "level": "CT",
+      "name": "Oxfordshire & North Buckinghamshire County 2027",
+      "file": "OxfordshireNorthBuckinghamshire-2027-SC.txt",
+      "county": "Oxfordshire & North Buckinghamshire",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-02-16",
+        "to": "2026-12-01"
+      }
+    },
+    {
+      "level": "CT",
+      "name": "Somerset County 2027",
+      "file": "Somerset-2027-SC.txt",
+      "county": "Somerset",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-01-01",
+        "to": "2026-12-31"
+      }
+    },
+    {
+      "level": "CT",
+      "name": "Staffordshire County 2027",
+      "file": "Staffordshire-2027-SC.txt",
+      "county": "Staffordshire",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-04-01",
+        "to": "2027-01-04"
+      }
+    },
+    {
+      "level": "CT",
+      "name": "Suffolk County 2027",
+      "file": "Suffolk-2027-SC.txt",
+      "county": "Suffolk",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-01-01",
+        "to": "2027-01-08"
+      }
+    },
+    {
+      "level": "CT",
+      "name": "Surrey County 2027",
+      "file": "Surrey-2027-SC.txt",
+      "county": "Surrey",
+      "course": "SC",
+      "window": {
+        "from": "2026-02-09",
+        "to": null
+      },
+      "disabled": true,
+      "disabledReason": "the page does not say what date ages are taken as at"
+    },
+    {
+      "level": "CT",
+      "name": "Warwickshire County 2027",
+      "file": "Warwickshire-2027-SC.txt",
+      "county": "Warwickshire",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-01-01",
+        "to": "2026-12-20"
+      }
+    },
+    {
+      "level": "CT",
+      "name": "Wiltshire County 2027",
+      "file": "Wiltshire-2027-SC.txt",
+      "county": "Wiltshire",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-05-16",
+        "to": "2026-12-16"
+      },
+      "disabled": true,
+      "disabledReason": "titled \"Consideration Times\" - not clear these are guaranteed qualifying times"
+    },
+    {
+      "level": "CT",
+      "name": "Worcestershire County 2027",
+      "file": "Worcestershire-2027-SC.txt",
+      "county": "Worcestershire",
+      "course": "SC",
+      "ageAsAt": "2027-12-31",
+      "window": {
+        "from": "2026-01-01",
+        "to": "2026-12-14"
+      }
+    }
+  ]
+}

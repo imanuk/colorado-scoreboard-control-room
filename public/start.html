@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="/scoreboard.css">
+    <style>
+        body.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title-box">
+            <div id="title-line"></div>
+            <div class="subtitle" id="event-title"></div>
+        </div>
+        
+        <div class="lane-row">
+            <div class="lane-number">8</div>
+            <div class="lane-name" id="lane-8"></div>
+        </div>
+        
+        <div class="lane-row">
+            <div class="lane-number">7</div>
+            <div class="lane-name" id="lane-7"></div>
+        </div>
+        
+        <div class="lane-row">
+            <div class="lane-number">6</div>
+            <div class="lane-name" id="lane-6"></div>
+        </div>
+        
+        <div class="lane-row">
+            <div class="lane-number">5</div>
+            <div class="lane-name" id="lane-5"></div>
+        </div>
+        
+        <div class="lane-row">
+            <div class="lane-number">4</div>
+            <div class="lane-name" id="lane-4"></div>
+        </div>
+        
+        <div class="lane-row">
+            <div class="lane-number">3</div>
+            <div class="lane-name" id="lane-3"></div>
+        </div>
+        
+        <div class="lane-row">
+            <div class="lane-number">2</div>
+            <div class="lane-name" id="lane-2"></div>
+        </div>
+        
+        <div class="lane-row">
+            <div class="lane-number">1</div>
+            <div class="lane-name" id="lane-1"></div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/autoreload.js"></script>
+    <script>
+        const socket = io();
+        watchVersion(socket);
+        
+        socket.on('scoreboard', function(data) {
+            const meetTitle = data.event_name || 'Meet';
+            const eventHeat = data.event_heat || 'Event 0 Heat 0';
+            document.getElementById('title-line').textContent = `${meetTitle} ~ ${eventHeat} ~ Start`;
+            
+            const eventTitle = data.event_title || '';
+            document.getElementById('event-title').textContent = eventTitle;
+            
+            for (let i = 1; i <= 8; i++) {
+                const name = data[`lane_name${i}`] || '';
+                document.getElementById(`lane-${i}`).textContent = name;
+            }
+            
+            // Simple: show if display_state is 'start'
+            if (data.display_state === 'start') {
+                document.body.classList.remove('hidden');
+                console.log('START - SHOWING');
+            } else {
+                document.body.classList.add('hidden');
+                console.log('START - HIDDEN (state:', data.display_state, ')');
+            }
+        });
+    </script>
+</body>
+</html>

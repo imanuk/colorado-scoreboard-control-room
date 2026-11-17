@@ -1,0 +1,151 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stream title and chapters</title>
+<style>
+  :root { --bg:#14181c; --card:#1c2127; --line:#262c33; --text:#e8eef2; --dim:#8a97a3; --ok:#34c759; --warn:#ffb340; --bad:#ff5a4f; --accent:#3b82f6; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 18px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+  .card h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin: 0 0 10px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  input[type=text], textarea, select, input[type=number] { font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: #111519; color: var(--text); }
+  input[type=text] { flex: 1; min-width: 240px; }
+  textarea { width: 100%; resize: vertical; line-height: 1.45; }
+  button { font: inherit; font-size: 13px; padding: 8px 14px; border-radius: 8px; background: var(--card); border: 1px solid #3a424a; color: var(--text); cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.copy.done { border-color: var(--ok); color: var(--ok); }
+  .note { font-size: 12px; color: var(--dim); margin-top: 6px; line-height: 1.45; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td { padding: 6px 8px; border-top: 1px solid var(--line); }
+  td.t { width: 80px; font-variant-numeric: tabular-nums; color: #ffd700; }
+  .ok { color: var(--ok); } .bad { color: var(--warn); }
+  label.small { font-size: 12px; color: var(--dim); display: flex; align-items: center; gap: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Stream title and chapters</h1>
+  <div class="sub">Everything to paste into YouTube / Restream. Nothing here is sent anywhere for you - use the Copy buttons.</div>
+
+  <div class="card">
+    <h2>Title</h2>
+    <div class="row"><input type="text" id="title"><button class="copy" data-copy="title">Copy title</button></div>
+    <div class="note" id="titlenote"></div>
+  </div>
+
+  <div class="card">
+    <h2>Description</h2>
+    <div class="note" style="margin:0 0 6px">Your intro (saved for next time):</div>
+    <textarea id="intro" rows="3"></textarea>
+    <div class="note" style="margin:10px 0 6px">What to paste (title, date, intro, then the chapters):</div>
+    <textarea id="description" rows="12" readonly></textarea>
+    <div class="row" style="margin-top:8px">
+      <button class="copy" data-copy="description">Copy whole description</button>
+      <button class="copy" data-copy="chapters">Copy chapters only</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Chapters <span id="running" style="text-transform:none;letter-spacing:0"></span></h2>
+    <div class="row" style="margin-bottom:10px">
+      <label class="small">Stream <select id="streamsel"></select></label>
+      <label class="small">Nudge timestamps <input type="number" id="shift" value="0" step="1" style="width:70px"> seconds</label>
+    </div>
+    <table id="chapters"></table>
+    <div class="note" id="validation"></div>
+    <div class="note">Times count from the moment you pressed Go live. YouTube's own timeline can start a few seconds later or earlier than OBS - if the chapters look slightly early or late on the replay, nudge them (positive = later) and copy again. YouTube turns timestamp lines into chapters when the first is 0:00, there are at least three, and each lasts ten seconds or more.</div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/autoreload.js"></script>
+<script>
+  const socket = io();
+  watchVersion(socket);
+  const $ = (id) => document.getElementById(id);
+  let data = null;
+  let titleEdited = false;
+  let streamSel = 'latest';
+
+  async function load() {
+    const shift = Number($('shift').value) || 0;
+    const r = await fetch(`/api/stream-info?stream=${streamSel}&shift=${shift}`);
+    data = await r.json();
+    render();
+  }
+
+  function render() {
+    if (!titleEdited) $('title').value = data.title;
+    const p = data.titleParts;
+    $('titlenote').textContent = `Built from the meet name "${p.meet || '?'}"${p.session ? ` and session ${p.session} (from the meet files)` : ' - no session number found in the meet files'}. Edit it if you want something different; it is not changed again once you edit it.`;
+    if (document.activeElement !== $('intro')) $('intro').value = data.intro;
+
+    const sel = $('streamsel');
+    sel.textContent = '';
+    if (!data.streams.length) { const o = document.createElement('option'); o.textContent = 'none yet'; sel.appendChild(o); sel.disabled = true; }
+    else {
+      sel.disabled = false;
+      data.streams.slice().reverse().forEach((s) => {
+        const o = document.createElement('option');
+        o.value = s.index;
+        o.textContent = `${new Date(s.start).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}${s.running ? ' (live now)' : ''}`;
+        if (s.index === data.selected) o.selected = true;
+        sel.appendChild(o);
+      });
+    }
+    const cur = data.streams.find((s) => s.index === data.selected);
+    $('running').textContent = cur && cur.running ? '- live now, updating' : '';
+
+    const t = $('chapters');
+    t.textContent = '';
+    data.chapters.forEach((c) => {
+      const tr = document.createElement('tr');
+      const a = document.createElement('td'); a.className = 't'; a.textContent = c.time;
+      const b = document.createElement('td'); b.textContent = c.label;
+      tr.append(a, b); t.appendChild(tr);
+    });
+    if (!data.chapters.length) { const tr = document.createElement('tr'); const td = document.createElement('td'); td.textContent = 'No chapters yet.'; tr.appendChild(td); t.appendChild(tr); }
+    const v = $('validation');
+    v.className = `note ${data.validation.ok ? 'ok' : 'bad'}`;
+    v.textContent = data.validation.ok ? 'These meet YouTube\'s chapter rules.' : data.validation.problems.join(' ');
+    rebuildDescription();
+  }
+
+  // the description is always built from the (possibly edited) title + intro and the latest chapters
+  function rebuildDescription() {
+    if (!data) return;
+    const parts = [$('title').value, data.dateText].filter(Boolean).join('\n');
+    const body = [parts, $('intro').value.trim()].filter(Boolean).join('\n\n');
+    $('description').value = data.chapters.length ? `${body}\n\nChapters\n${data.chaptersText}` : body;
+  }
+
+  $('title').addEventListener('input', () => { titleEdited = true; rebuildDescription(); });
+  $('intro').addEventListener('input', rebuildDescription);
+  $('intro').addEventListener('change', () => fetch('/api/stream-config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ descriptionIntro: $('intro').value }) }));
+  $('shift').addEventListener('change', load);
+  $('streamsel').addEventListener('change', (e) => { streamSel = e.target.value; load(); });
+
+  async function copyText(text, btn) {
+    try { await navigator.clipboard.writeText(text); }
+    catch { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+    const old = btn.textContent;
+    btn.textContent = 'Copied ✓'; btn.classList.add('done');
+    setTimeout(() => { btn.textContent = old; btn.classList.remove('done'); }, 1600);
+  }
+  document.querySelectorAll('button.copy').forEach((b) => b.addEventListener('click', () => {
+    const what = b.dataset.copy;
+    copyText(what === 'title' ? $('title').value : what === 'chapters' ? (data ? data.chaptersText : '') : $('description').value, b);
+  }));
+
+  load();
+  setInterval(() => { if (data && data.streams.some((s) => s.running && s.index === data.selected)) load(); }, 5000);
+</script>
+<script src="/backlink.js"></script>
+</body>
+</html>
